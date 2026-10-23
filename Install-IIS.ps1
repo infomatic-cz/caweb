@@ -3,24 +3,17 @@ param(
     [Parameter(Mandatory)]
     [string] $PackagePath,
 
-    [Parameter(Mandatory)]
-    [ValidatePattern('^[A-Za-z0-9.-]+$')]
-    [string] $HostName,
+    # Optional only when IIS hosts multiple HTTPS websites. This is the existing IIS site name, not a URL or hostname.
+    [string] $SiteName,
 
-    [Parameter(Mandatory)]
-    [ValidatePattern('^[A-Fa-f0-9 ]{40,64}$')]
-    [string] $HttpsCertificateThumbprint,
-
-    [string] $SiteName = 'CAWeb',
     [string] $AppPoolName = 'CAWeb',
     [string] $SiteRoot = 'C:\inetpub\CAWeb',
-    [string] $DataPath = 'C:\ProgramData\CAWeb\data',
-    [ValidateRange(1, 65535)]
-    [int] $HttpsPort = 443
+    [string] $DataPath = 'C:\ProgramData\CAWeb\data'
 )
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
+$applicationName = 'caweb'
 
 function Assert-Administrator {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -34,18 +27,43 @@ Assert-Administrator
 
 $archive = (Resolve-Path -LiteralPath $PackagePath).Path
 if ([IO.Path]::GetExtension($archive) -ne '.zip') { throw 'PackagePath must point to the CAWeb release ZIP.' }
-$thumbprint = ($HttpsCertificateThumbprint -replace '\s', '').ToUpperInvariant()
-$bindingCertificate = Get-Item -LiteralPath "Cert:\LocalMachine\My\$thumbprint" -ErrorAction Stop
-if (-not $bindingCertificate.HasPrivateKey) { throw 'The HTTPS binding certificate must include its private key.' }
-if ($bindingCertificate.NotAfter.ToUniversalTime() -le [DateTime]::UtcNow) { throw 'The HTTPS binding certificate is expired.' }
-
-Import-Module WebAdministration -ErrorAction Stop
 if (-not (Get-Module -ListAvailable -Name WebAdministration)) { throw 'Install the IIS management tools before deploying CAWeb.' }
+Import-Module WebAdministration -ErrorAction Stop
 if (-not (Test-Path -LiteralPath "$env:windir\System32\inetsrv\aspnetcore.dll")) {
-    throw 'Install the ASP.NET Core Hosting Bundle for .NET 10, then restart IIS before deploying CAWeb.'
+    throw 'The .NET 10 ASP.NET Core Hosting Bundle is not installed. Install it once for IIS, then run this installer again.'
 }
 
-$siteRootPath = [IO.Path]::GetFullPath($SiteRoot)
+$sites = @(Get-Website)
+if (-not [string]::IsNullOrWhiteSpace($SiteName)) {
+    $targetSite = $sites | Where-Object { $_.Name -eq $SiteName } | Select-Object -First 1
+    if ($null -eq $targetSite) { throw "The existing IIS website '$SiteName' was not found." }
+} else {
+    $httpsSites = @(
+        foreach ($candidate in $sites) {
+            $candidateBindings = @(Get-WebBinding -Name $candidate.Name -Protocol https -ErrorAction SilentlyContinue)
+            if ($candidate.State -eq 'Started' -and $candidateBindings.Count -gt 0) { $candidate }
+        }
+    )
+    if ($httpsSites.Count -eq 1) {
+        $targetSite = $httpsSites[0]
+    } elseif ($httpsSites.Count -gt 1) {
+        $available = ($httpsSites | ForEach-Object { $_.Name }) -join ', '
+        throw "More than one running IIS website already has HTTPS ($available). Re-run with -SiteName '<existing IIS site name>' to choose where /caweb belongs."
+    } else {
+        throw 'No running IIS website with an existing HTTPS binding was found. Start the website that should host /caweb or specify its name with -SiteName.'
+    }
+}
+$httpsBindings = @(Get-WebBinding -Name $targetSite.Name -Protocol https -ErrorAction SilentlyContinue)
+if ($httpsBindings.Count -eq 0) { throw "The existing IIS website '$($targetSite.Name)' has no HTTPS binding. CAWeb does not create or change site bindings." }
+if ($targetSite.State -ne 'Started') { throw "The existing IIS website '$($targetSite.Name)' is not started. Start it in IIS Manager, then run this installer again." }
+
+$siteRootPath = [IO.Path]::GetFullPath($SiteRoot).TrimEnd('\')
+$dataPath = [IO.Path]::GetFullPath($DataPath).TrimEnd('\')
+$driveRoot = [IO.Path]::GetPathRoot($dataPath).TrimEnd('\')
+if ($dataPath -eq $driveRoot -or $dataPath.StartsWith($siteRootPath + '\', [StringComparison]::OrdinalIgnoreCase) -or
+    $siteRootPath.StartsWith($dataPath + '\', [StringComparison]::OrdinalIgnoreCase) -or $dataPath -eq $siteRootPath) {
+    throw 'DataPath must be a dedicated directory outside the IIS release directory.'
+}
 $releaseRoot = Join-Path $siteRootPath 'releases'
 $stagingPath = Join-Path ([IO.Path]::GetTempPath()) ("CAWeb-install-" + [guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Path $releaseRoot -Force
@@ -62,13 +80,23 @@ try {
         throw 'The release manifest is invalid.'
     }
 
+    $existingApplication = @(Get-WebApplication -Site $targetSite.Name | Where-Object { $_.Name -ieq $applicationName -or $_.Path -ieq "/$applicationName" }) | Select-Object -First 1
+    if ($null -ne $existingApplication) {
+        $oldManifest = Join-Path $existingApplication.PhysicalPath 'caweb-release.json'
+        if (-not (Test-Path -LiteralPath $oldManifest)) {
+            throw "The existing IIS application /$applicationName is not a CAWeb installation. It was left unchanged."
+        }
+        $oldIdentity = Get-Content -LiteralPath $oldManifest -Raw | ConvertFrom-Json
+        if ($oldIdentity.application -ne 'CAWeb') { throw "The existing IIS application /$applicationName is not CAWeb. It was left unchanged." }
+    }
+
     $releasePath = Join-Path $releaseRoot $manifest.version
-    if (Test-Path -LiteralPath $releasePath) { throw "Release $($manifest.version) is already installed. Keep existing release folders for rollback." }
+    if (Test-Path -LiteralPath $releasePath) { throw "Release $($manifest.version) is already installed. Keep existing releases for rollback." }
     Move-Item -LiteralPath $stagingPath -Destination $releasePath
     $stagingPath = $null
 
-    $null = New-Item -ItemType Directory -Path $DataPath -Force
-    $accessControl = Get-Acl -LiteralPath $DataPath
+    $null = New-Item -ItemType Directory -Path $dataPath -Force
+    $accessControl = Get-Acl -LiteralPath $dataPath
     $identityName = "IIS AppPool\$AppPoolName"
     $accessControl.SetAccessRuleProtection($true, $false)
     $accessControl.SetOwner([Security.Principal.NTAccount]::new('BUILTIN\Administrators'))
@@ -78,7 +106,7 @@ try {
     }
     $dataRule = [Security.AccessControl.FileSystemAccessRule]::new($identityName, 'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
     $accessControl.SetAccessRule($dataRule)
-    Set-Acl -LiteralPath $DataPath -AclObject $accessControl
+    Set-Acl -LiteralPath $dataPath -AclObject $accessControl
 
     $releaseAcl = Get-Acl -LiteralPath $releasePath
     $readRule = [Security.AccessControl.FileSystemAccessRule]::new($identityName, 'ReadAndExecute', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
@@ -99,7 +127,7 @@ try {
         $dataVariable.SetAttribute('name', 'CAWEB_DATA_DIR')
         [void] $aspNetCore.environmentVariables.AppendChild($dataVariable)
     }
-    $dataVariable.SetAttribute('value', [IO.Path]::GetFullPath($DataPath))
+    $dataVariable.SetAttribute('value', $dataPath)
     $webConfig.Save($webConfigPath)
 
     $pool = Get-Item -LiteralPath "IIS:\AppPools\$AppPoolName" -ErrorAction SilentlyContinue
@@ -109,28 +137,20 @@ try {
     Set-ItemProperty -LiteralPath "IIS:\AppPools\$AppPoolName" -Name enable32BitAppOnWin64 -Value $false
     Set-ItemProperty -LiteralPath "IIS:\AppPools\$AppPoolName" -Name processModel.identityType -Value 'ApplicationPoolIdentity'
 
-    $site = Get-Website -Name $SiteName -ErrorAction SilentlyContinue
-    if ($null -eq $site) {
-        $null = New-Website -Name $SiteName -PhysicalPath $releasePath -ApplicationPool $AppPoolName -Port $HttpsPort -HostHeader $HostName -IPAddress '*' -Ssl -SslFlags 1
+    if ($null -eq $existingApplication) {
+        $null = New-WebApplication -Site $targetSite.Name -Name $applicationName -PhysicalPath $releasePath -ApplicationPool $AppPoolName
     } else {
-        if ($site.State -eq 'Started') { Stop-Website -Name $SiteName }
-        Set-ItemProperty -LiteralPath "IIS:\Sites\$SiteName" -Name physicalPath -Value $releasePath
-        Set-ItemProperty -LiteralPath "IIS:\Sites\$SiteName" -Name applicationPool -Value $AppPoolName
+        $iisApplicationPath = "IIS:\Sites\$($targetSite.Name)\$applicationName"
+        Set-ItemProperty -LiteralPath $iisApplicationPath -Name physicalPath -Value $releasePath
+        Set-ItemProperty -LiteralPath $iisApplicationPath -Name applicationPool -Value $AppPoolName
     }
-
-    Get-WebBinding -Name $SiteName -Protocol http -ErrorAction SilentlyContinue | Remove-WebBinding
-    $binding = Get-WebBinding -Name $SiteName -Protocol https -Port $HttpsPort -ErrorAction SilentlyContinue | Where-Object { $_.bindingInformation -like "*:${HttpsPort}:$HostName" } | Select-Object -First 1
-    if ($null -eq $binding) {
-        New-WebBinding -Name $SiteName -Protocol https -IPAddress '*' -Port $HttpsPort -HostHeader $HostName -SslFlags 1
-        $binding = Get-WebBinding -Name $SiteName -Protocol https -Port $HttpsPort | Where-Object { $_.bindingInformation -like "*:${HttpsPort}:$HostName" } | Select-Object -First 1
-    }
-    $binding.AddSslCertificate($thumbprint, 'My')
 
     if ((Get-WebAppPoolState -Name $AppPoolName).Value -ne 'Started') { Start-WebAppPool -Name $AppPoolName }
-    Start-Website -Name $SiteName
-    Write-Host "CAWeb $($manifest.version) is installed at https://${HostName}:$HttpsPort/" -ForegroundColor Green
-    Write-Host "Application data: $([IO.Path]::GetFullPath($DataPath))"
-    Write-Host "IIS application pool: $AppPoolName (ApplicationPoolIdentity)"
+    Write-Host "CAWeb $($manifest.version) is installed as /$applicationName under the existing IIS website '$($targetSite.Name)'." -ForegroundColor Green
+    Write-Host "Open https://<the existing site's host>/$applicationName/"
+    Write-Host 'The parent website, HTTPS bindings, certificate and root application were not changed.'
+    Write-Host "Application data: $dataPath"
+    Write-Host "Application pool: $AppPoolName (ApplicationPoolIdentity)"
 } finally {
     if ($stagingPath -and (Test-Path -LiteralPath $stagingPath)) { Remove-Item -LiteralPath $stagingPath -Recurse -Force }
 }

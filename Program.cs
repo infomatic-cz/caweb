@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Net;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -66,6 +67,12 @@ public static class Program
         var app = builder.Build();
         await app.Services.GetRequiredService<AppDatabase>().InitializeAsync();
 
+        // Simulate IIS's PathBase handling in the integration smoke test. Production IIS supplies PathBase itself.
+        var testPathBase = Environment.GetEnvironmentVariable("CAWEB_TEST_PATH_BASE");
+        if (app.Environment.IsDevelopment() && !string.IsNullOrWhiteSpace(testPathBase))
+            app.UsePathBase(new PathString(testPathBase));
+        app.UseRouting();
+
         app.Use(async (context, next) =>
         {
             context.Response.Headers.XContentTypeOptions = "nosniff";
@@ -113,7 +120,6 @@ public static class Program
 
         app.UseAuthentication();
         app.UseAuthorization();
-        app.UseDefaultFiles();
         app.UseStaticFiles();
 
         var database = app.Services.GetRequiredService<AppDatabase>();
@@ -336,7 +342,8 @@ public static class Program
             CertificateService.ValidateServer(server);
             await database.SaveServerAsync(server, cancellationToken);
             await database.AddAuditAsync(user.Id, user.Username, new AuditEntry("created", "server", server.Id, server.Name), cancellationToken);
-            return Results.Created($"/api/servers/{server.Id}", CertificateService.Summarize(server, await database.GetAuthorityAsync(cancellationToken)));
+            var location = context.Request.PathBase.Add($"/api/servers/{server.Id}").ToUriComponent();
+            return Results.Created(location, CertificateService.Summarize(server, await database.GetAuthorityAsync(cancellationToken)));
         });
 
         api.MapPut("/servers/{id}", async (string id, ServerInput input, HttpContext context, CancellationToken cancellationToken) =>
@@ -364,7 +371,8 @@ public static class Program
             };
             await database.SaveServerAsync(copy, cancellationToken);
             await database.AddAuditAsync(user.Id, user.Username, new AuditEntry("duplicated", "server", copy.Id, copy.Name), cancellationToken);
-            return Results.Created($"/api/servers/{copy.Id}", CertificateService.Summarize(copy, await database.GetAuthorityAsync(cancellationToken)));
+            var location = context.Request.PathBase.Add($"/api/servers/{copy.Id}").ToUriComponent();
+            return Results.Created(location, CertificateService.Summarize(copy, await database.GetAuthorityAsync(cancellationToken)));
         });
 
         api.MapPost("/servers/{id}/delete", async (string id, ConfirmationRequest input, HttpContext context, CancellationToken cancellationToken) =>
@@ -423,7 +431,8 @@ public static class Program
             user = user with { PasswordHash = passwordHasher.HashPassword(user, input.Password) };
             await database.CreateUserAsync(user, cancellationToken);
             await database.AddAuditAsync(current.Id, current.Username, new AuditEntry("created", "user", user.Id, user.Username), cancellationToken);
-            return Results.Created($"/api/users/{user.Id}", PublicUser(user));
+            var location = context.Request.PathBase.Add($"/api/users/{user.Id}").ToUriComponent();
+            return Results.Created(location, PublicUser(user));
         });
 
         api.MapPut("/users/{id}", async (string id, UserUpdateRequest input, HttpContext context, CancellationToken cancellationToken) =>
@@ -539,7 +548,20 @@ public static class Program
             return Results.Ok(new { sent = true });
         });
 
-        app.MapFallbackToFile("index.html");
+        var indexTemplatePath = Path.Combine(app.Environment.WebRootPath, "index.html");
+        async Task RenderIndexAsync(HttpContext context)
+        {
+            var html = await File.ReadAllTextAsync(indexTemplatePath, context.RequestAborted);
+            var basePath = (context.Request.PathBase.Value ?? string.Empty).TrimEnd('/') + "/";
+            var baseHref = HtmlEncoder.Default.Encode(basePath);
+            html = html.Replace("<base href=\"./\">", $"<base href=\"{baseHref}\">", StringComparison.Ordinal);
+            context.Response.Headers.CacheControl = "no-cache";
+            context.Response.ContentType = "text/html; charset=utf-8";
+            await context.Response.WriteAsync(html, context.RequestAborted);
+        }
+
+        app.MapGet("/", RenderIndexAsync);
+        app.MapFallback(RenderIndexAsync);
         await app.RunAsync();
     }
 

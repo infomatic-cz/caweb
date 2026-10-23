@@ -1,6 +1,6 @@
 # CAWeb
 
-**CAWeb** je dvojjazyčná webová aplikace pro správu interní certifikační autority a HTTPS certifikátů serverů IIS a Tomcat. Lze ji nainstalovat jako aplikaci na Windows IIS a instalovat do telefonu či počítače jako PWA.
+**CAWeb** je dvojjazyčná webová aplikace pro správu interní certifikační autority a HTTPS certifikátů serverů IIS a Tomcat. Na existujícím IIS se připojí jako podaplikace `/caweb` pod již běžící web a využije jeho HTTPS binding i certifikát. Lze ji instalovat do telefonu či počítače jako PWA.
 
 ## Co aplikace umí
 
@@ -13,7 +13,7 @@
 
 ## Rychlý odkaz
 
-- [Instalace na IIS (česky)](docs/INSTALL-IIS-CS.md)
+- [Instalace pod `/caweb` na existujícím IIS (česky)](docs/INSTALL-IIS-CS.md)
 - [IIS installation (English)](docs/INSTALL-IIS-EN.md)
 - [Architektura a bezpečnostní hranice](docs/ARCHITECTURE.md)
 - [Zálohy a provozní postupy](docs/OPERATIONS.md)
@@ -31,7 +31,11 @@ Všechna sestavení, NuGet balíčky, testovací data i ZIP se vytvářejí v `C
 .\Release.ps1 -Summary "Stručný popis změny"
 ```
 
-Skript zvedne patch verzi, doplní `CHANGELOG.md`, vytvoří self-contained Windows x64 build, spustí integrační smoke test, připraví ZIP a odešle změny přímo do `origin/main`. Při souběžné ruční změně na GitHubu nejprve stáhne a začlení vzdálené commity; konflikty ponechá k vyřešení bez zahazování souborů.
+Skript zvedne patch verzi, doplní `CHANGELOG.md`, vytvoří self-contained Windows x64 build, ověří aplikaci na kořeni i pod cestou `/caweb`, připraví ZIP a odešle změny přímo do `origin/main`. Při souběžné ruční změně na GitHubu nejprve stáhne a začlení vzdálené commity; konflikty ponechá k vyřešení bez zahazování souborů.
+
+## Nasazení pod existující IIS web
+
+Instalační skript připojí aplikaci jako samostatnou IIS podaplikaci `/caweb` a vytvoří jí vlastní aplikační pool. Automaticky vybere jediný spuštěný web s existujícím HTTPS bindingem; pokud jich IIS hostí více, lze vybrat cílový **název webu v IIS** pomocí `-SiteName`. Nezadává se hostname ani certifikát a kořenový web, jeho HTTPS bindingy ani další aplikace se nemění. Detaily jsou v [postupu nasazení](docs/INSTALL-IIS-CS.md).
 
 ## Aktuální rozsah
 

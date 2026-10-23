@@ -113,7 +113,9 @@ async function request(path, options = {}) {
     headers.set('Content-Type', 'application/json');
     options.body = JSON.stringify(options.body);
   }
-  const response = await fetch(path, { ...options, method, headers, credentials: 'same-origin' });
+  const appBase = document.querySelector('base')?.href ?? `${location.origin}/`;
+  const requestUrl = new URL(String(path).replace(/^\/+/, ''), appBase);
+  const response = await fetch(requestUrl, { ...options, method, headers, credentials: 'same-origin' });
   if (response.status === 401 && screen === 'app') {
     state = await fetchStatus().catch(() => null);
     screen = state?.setupRequired ? 'setup' : 'login';
@@ -675,4 +677,9 @@ dialog.addEventListener('click', event => { if (event.target === dialog) dialog.
 dialog.addEventListener('submit', handleSubmit);
 dialog.addEventListener('change', handleChange);
 initialize();
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  const appBase = document.querySelector('base')?.href ?? `${location.origin}/`;
+  const serviceWorkerUrl = new URL('service-worker.js', appBase);
+  const serviceWorkerScope = new URL('./', appBase).pathname;
+  navigator.serviceWorker.register(serviceWorkerUrl, { scope: serviceWorkerScope }).catch(() => {});
+}

@@ -1,80 +1,59 @@
-# Installing CAWeb on Windows IIS
+# Install CAWeb under `/caweb` on an existing IIS site
 
-This procedure targets a single Windows Server instance. The application is published as a self-contained `win-x64` deployment, so a separate .NET runtime is not needed. IIS still needs the ASP.NET Core Module installed by the .NET 10 Hosting Bundle.
+CAWeb is attached as an IIS **sub-application** at `https://<existing-host>/caweb/`. It uses HTTPS and the certificate already configured on the parent IIS site. The installer does not create a website or change the hostname, port, TLS binding, certificate, or root application.
 
-## 1. Prepare the server
+## Requirements
 
-1. Install **IIS** with the Web Server role, Static Content, and IIS Management Tools.
-2. Install the current **.NET 10 Hosting Bundle** from [Microsoft .NET 10 downloads](https://dotnet.microsoft.com/download/dotnet/10.0). Restart IIS or the server afterward.
-3. Prepare a DNS name for the admin site, for example `caweb.intranet.example`.
-4. Import a TLS certificate **for the CAWeb admin site** into `Cert:\LocalMachine\My`, including its private key. This IIS binding certificate is separate from the CA managed by the application.
-5. Copy the release ZIP and `Install-IIS.ps1` from `C:\Temp\CAWeb-Build\artifacts` to the server, for example `C:\Transfer`.
+- A running IIS website with its HTTPS binding already configured.
+- The ASP.NET Core Module for .NET 10 (included in the .NET 10 Hosting Bundle). If other ASP.NET Core apps already run on this IIS server, the module is usually installed. The installer checks for it.
+- Administrator rights on the server.
 
-## 2. Install the application
+## Install
 
-Open PowerShell as Administrator:
+1. Copy `CAWeb-0.1.3-win-x64.zip` and `Install-IIS.ps1` from `C:\Temp\CAWeb-Build\artifacts` to the server, for example `C:\Transfer`.
+2. Open PowerShell **as Administrator** and run:
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
 Set-Location C:\Transfer
-./Install-IIS.ps1 `
-  -PackagePath C:\Transfer\CAWeb-0.1.1-win-x64.zip `
-  -HostName caweb.intranet.example `
-  -HttpsCertificateThumbprint 'REPLACE_WITH_TLS_CERTIFICATE_THUMBPRINT'
+.\Install-IIS.ps1 -PackagePath C:\Transfer\CAWeb-0.1.3-win-x64.zip
 ```
 
-The installer creates an `ApplicationPoolIdentity` pool named `CAWeb`, an HTTPS SNI binding, the required IIS Hosting Module, the data folder `C:\ProgramData\CAWeb\data`, and the necessary ACLs. It does not expose the site over HTTP. Optional parameters are `-SiteName`, `-AppPoolName`, `-SiteRoot`, `-DataPath`, and `-HttpsPort`.
-
-Check the site and health endpoint:
+The installer automatically selects the only running IIS website with an existing HTTPS binding. If IIS has more than one, specify the target **website name shown in IIS Manager**. This is not a URL or hostname:
 
 ```powershell
-Get-Website -Name CAWeb
-Get-WebAppPoolState -Name CAWeb
-Invoke-RestMethod https://caweb.intranet.example/health
+.\Install-IIS.ps1 `
+  -PackagePath C:\Transfer\CAWeb-0.1.3-win-x64.zip `
+  -SiteName 'Name of the existing IIS website'
 ```
 
-For an internal TLS certificate, distribute its trust chain to the client computers that open the admin site.
+The installer extracts the version to `C:\inetpub\CAWeb\releases\<version>`, creates a dedicated `CAWeb` application pool with `ApplicationPoolIdentity`, and attaches it to the existing website as the `/caweb` application. The database and keys are stored outside the website in `%ProgramData%\CAWeb\data`, with a restricted ACL for the app pool, SYSTEM, and Windows administrators.
 
-## 3. Complete first-run setup
+The parent website, its applications and bindings are left in place. CAWeb does not ask for or store the server name, port, or HTTPS certificate. Browsers use the existing website address and its TLS configuration.
 
-1. Open `https://caweb.intranet.example`.
-2. Enter the administrator's name, email, language, and a strong password for `admin` (at least 14 characters).
-3. Enter the SMTP host, port, sender address and credentials, or skip SMTP. Local management works without SMTP; registration notifications will not be sent.
-4. Finish setup and sign in as the administrator.
+After installation, open:
 
-## 4. Preserve your existing CA
+```text
+https://<same-host-as-the-parent-website>/caweb/
+```
 
-1. Open **Certificate authority → Import existing CA**.
-2. Choose either an existing CA PFX/P12 and its password, or the public PEM/DER certificate together with its matching PEM private key.
-3. Enter the key password for an encrypted PEM. Leave it blank for an unencrypted PEM.
-4. Verify the imported subject, fingerprint and validity. The original public certificate is retained; its private key is encrypted in the application database.
+Check availability with:
 
-Files in `Podklady\` are not copied into the deployment or GitHub. Select them directly in the administrator's browser.
+```powershell
+Invoke-RestMethod https://<same-host-as-the-parent-website>/caweb/health
+```
 
-## 5. Issue and install certificates
+## First run
 
-1. In **Servers and certificates**, add a server and enter its CN, DN, DNS/IP SANs, KeyUsage, target server type and validity.
-2. Review the values before issuance and confirm the review checkbox.
-3. Choose a password for the downloaded PFX (IIS) or P12 (Tomcat). CAWeb never stores this password.
-4. IIS: import the PFX into Local Computer\Personal and assign it to the target site's HTTPS binding.
-5. Tomcat: import the P12 into its keystore and configure the connector. Use the password chosen when issuing the certificate.
-6. Distribute the public CA certificate to clients and servers according to your infrastructure. P7B includes the public certificate chain.
+1. Open the `/caweb/` address above in a browser.
+2. The setup wizard creates the `admin` account and asks for a name, email, personal language, and a password of at least 14 characters.
+3. Configure SMTP if needed; it can be added later.
+4. After sign-in, open **Certificate authority → Import existing CA** and select your existing CA PFX/P12 or its certificate and private PEM key. You don't need to copy files from `Podklady` to the server; select them in the browser on your computer.
 
-## 6. Updates
+## Update
 
-Extract each release into a new directory under `C:\inetpub\CAWeb\releases\<version>` and keep the previous release. Change the IIS Physical Path only after checking the new package. Keep `C:\ProgramData\CAWeb\data` and the Data Protection keys in place. The previous release folder supports a binary rollback.
+Copy the newer ZIP and `Install-IIS.ps1` to the server and run `Install-IIS.ps1 -PackagePath ...` again. The installer adds a new versioned release folder and switches only the `/caweb` application to it. The database, Data Protection keys, parent website, HTTPS binding, and other applications are preserved. Keep previous release folders for rollback.
 
-## 7. Security and backups
+## Backup and restore
 
-- Restrict access to the administration network and use HTTPS only.
-- Back up SQLite, Windows DPAPI/Data Protection keys and the separate CA PFX/P12 as described in the [operations guide](OPERATIONS.md).
-- Keep Windows Server, IIS and the .NET Hosting Bundle patched.
-- Never place passwords or keys in scripts, tickets or URLs.
-- After CA rotation, renew server certificates and redistribute the new root certificate. Follow the [CA rotation procedure](OPERATIONS.md#rotace-ca).
-
-## Requirements
-
-- Windows Server x64 with IIS.
-- .NET 10 Hosting Bundle and ANCM V2.
-- An existing TLS server certificate with its private key for the CAWeb HTTPS site.
-- Writable storage outside the application directory for SQLite and backups.
+Back up the complete `%ProgramData%\CAWeb\data` folder, including the SQLite database and `keys` directory, and keep a CA PFX/P12 export separately. See the [operations guide](OPERATIONS.md). When restoring the application, attach it again under `/caweb` on the same existing IIS website.

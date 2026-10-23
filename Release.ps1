@@ -162,6 +162,8 @@ if ($LASTEXITCODE -ne 0) { throw 'The self-contained Windows x64 publish failed.
 
 & (Join-Path $sourceRoot 'tests\Smoke-Test.ps1') -PublishPath $publishPath -BuildRoot $buildRoot
 if ($LASTEXITCODE -ne 0) { throw 'The CAWeb integration smoke test failed.' }
+& (Join-Path $sourceRoot 'tests\Smoke-Test.ps1') -PublishPath $publishPath -PathBase '/caweb' -BuildRoot $buildRoot
+if ($LASTEXITCODE -ne 0) { throw 'The CAWeb IIS sub-application smoke test failed.' }
 
 $manifest = [ordered]@{
     application = 'CAWeb'

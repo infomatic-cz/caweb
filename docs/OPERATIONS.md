@@ -6,16 +6,16 @@
 2. Zkopírujte celý `%ProgramData%\CAWeb\data` včetně `caweb.db`, případných `caweb.db-wal` a `caweb.db-shm` a adresáře `keys` do šifrovaného záložního úložiště.
 3. Data Protection klíče jsou ve složce `keys`, šifrované pomocí Windows DPAPI LocalMachine. Datová složka má ACL pro aplikační pool, SYSTEM a správce Windows. Při obnově na jiném serveru musí být obnoven odpovídající DPAPI stav.
 4. Uchovávejte export CA PFX/P12 odděleně od aplikace, pouze v šifrovaném úložišti a s evidovaným heslem.
-5. Znovu spusťte aplikační pool a ověřte `https://<host>/health` a přihlášení.
+5. Znovu spusťte aplikační pool CAWeb a ověřte `https://<host>/caweb/health` a přihlášení na `https://<host>/caweb/`.
 
 Samotná SQLite záloha bez složky `keys` neumí dešifrovat uložené privátní klíče a SMTP heslo. Na novém serveru lze znovu importovat externě uložený CA PFX/P12, který znáte a jehož heslo máte k dispozici.
 
 ## Obnova aplikace
 
-- Rozbalte požadovaný verzovaný ZIP do nového podadresáře `C:\inetpub\CAWeb\releases\<verze>`.
-- Nastavte aplikační pool CAWeb na nový adresář, ponechte data v `%ProgramData%\CAWeb\data`.
+- Zkopírujte nový instalační ZIP na server a spusťte `Install-IIS.ps1 -PackagePath <ZIP>`. Skript rozbalí novou verzi do `C:\inetpub\CAWeb\releases\<verze>` a přesměruje pouze IIS podaplikaci `/caweb`.
+- Ponechte oddělený pool `CAWeb` a data v `%ProgramData%\CAWeb\data`; skript nemění kořenový web ani jeho HTTPS binding.
 - Pokud se server měnil, obnovte DPAPI/Data Protection klíče na odpovídající Windows instanci. Bez nich databáze zůstane čitelná, ale šifrovaná pole zůstanou nedostupná.
-- Obnovte binding TLS certifikátu webového rozhraní a otestujte `/health`, přihlášení, metadata CA a vydání testovacího certifikátu.
+- Podaplikaci připojte zpět pod `/caweb` na existujícím IIS webu a otestujte `https://<host>/caweb/health`, přihlášení, metadata CA a vydání testovacího certifikátu.
 
 ## Rotace CA
 

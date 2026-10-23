@@ -3,6 +3,8 @@ param(
     [Parameter(Mandatory)]
     [string] $PublishPath,
 
+    [string] $PathBase = '',
+
     [string] $BuildRoot = 'C:\Temp\CAWeb-Build'
 )
 
@@ -15,6 +17,10 @@ if (-not $BuildRoot.StartsWith('C:\Temp\CAWeb-Build', [StringComparison]::Ordina
 if (-not (Test-Path -LiteralPath (Join-Path $PublishPath 'CAWeb.exe'))) {
     throw 'PublishPath must contain the published CAWeb.exe.'
 }
+if ($PathBase -and $PathBase -notmatch '^/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$') {
+    throw 'PathBase must be a URL path such as /caweb.'
+}
+$PathBase = $PathBase.TrimEnd('/')
 
 $testId = [guid]::NewGuid().ToString('N')
 $testDirectory = Join-Path $BuildRoot "tests\run-$testId"
@@ -28,6 +34,7 @@ $listener.Start()
 $port = ([Net.IPEndPoint] $listener.LocalEndpoint).Port
 $listener.Stop()
 $baseUrl = "http://127.0.0.1:$port"
+$applicationUrl = "$baseUrl$PathBase"
 
 function New-Client {
     $handler = [Net.Http.HttpClientHandler]::new()
@@ -48,7 +55,7 @@ function Invoke-JsonApi {
         [int[]] $ExpectedStatus = @(200),
         [switch] $OmitCsrf
     )
-    $requestMessage = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::new($Method), "$baseUrl$Path")
+    $requestMessage = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::new($Method), "$applicationUrl$Path")
     if (-not $OmitCsrf) { $requestMessage.Headers.Add('X-CAWeb-Request', '1') }
     if ($null -ne $Body) {
         $json = ConvertTo-Json -InputObject $Body -Depth 12 -Compress
@@ -72,7 +79,7 @@ function Invoke-Download {
         [Parameter(Mandatory)][object] $Body,
         [Parameter(Mandatory)][string] $OutputPath
     )
-    $requestMessage = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::Post, "$baseUrl$Path")
+    $requestMessage = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::Post, "$applicationUrl$Path")
     $requestMessage.Headers.Add('X-CAWeb-Request', '1')
     $json = ConvertTo-Json -InputObject $Body -Depth 12 -Compress
     $requestMessage.Content = [Net.Http.StringContent]::new($json, [Text.Encoding]::UTF8, 'application/json')
@@ -104,7 +111,7 @@ function Invoke-MultipartApi {
         $part.Headers.ContentType = [Net.Http.Headers.MediaTypeHeaderValue]::new('application/octet-stream')
         $content.Add($part, [string] $file.Field, [string] $file.Name)
     }
-    $requestMessage = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::Post, "$baseUrl$Path")
+    $requestMessage = [Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::Post, "$applicationUrl$Path")
     $requestMessage.Headers.Add('X-CAWeb-Request', '1')
     $requestMessage.Content = $content
     $response = $Client.SendAsync($requestMessage).GetAwaiter().GetResult()
@@ -123,9 +130,11 @@ function Assert-True {
 $previousData = $env:CAWEB_DATA_DIR
 $previousEnvironment = $env:ASPNETCORE_ENVIRONMENT
 $previousUrls = $env:ASPNETCORE_URLS
+$previousPathBase = $env:CAWEB_TEST_PATH_BASE
 $env:CAWEB_DATA_DIR = $testData
 $env:ASPNETCORE_ENVIRONMENT = 'Development'
 $env:ASPNETCORE_URLS = $baseUrl
+if ($PathBase) { $env:CAWEB_TEST_PATH_BASE = $PathBase } else { Remove-Item Env:\CAWEB_TEST_PATH_BASE -ErrorAction SilentlyContinue }
 $process = $null
 $adminClient = New-Client
 $registrationClient = New-Client
@@ -137,20 +146,30 @@ try {
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
         if ($process.HasExited) { throw 'The application exited before its health endpoint became ready.' }
         try {
-            $health = Invoke-RestMethod -Uri "$baseUrl/health" -TimeoutSec 2
+            $health = Invoke-RestMethod -Uri "$applicationUrl/health" -TimeoutSec 2
             if ($health.status -eq 'ok') { $ready = $true; break }
         } catch { Start-Sleep -Milliseconds 500 }
     }
     Assert-True $ready 'The application health endpoint did not become ready.'
 
-    $homeResponse = $adminClient.GetAsync("$baseUrl/").GetAwaiter().GetResult()
+    $homeResponse = $adminClient.GetAsync("$applicationUrl/").GetAwaiter().GetResult()
     Assert-True $homeResponse.IsSuccessStatusCode 'The web application shell did not load.'
     $html = $homeResponse.Content.ReadAsStringAsync().GetAwaiter().GetResult()
     Assert-True ($html.Contains('manifest.webmanifest')) 'The app manifest is not linked from the page.'
-    $manifest = $adminClient.GetAsync("$baseUrl/manifest.webmanifest").GetAwaiter().GetResult()
+    $expectedBaseHref = if ($PathBase) { "$PathBase/" } else { '/' }
+    Assert-True ($html.Contains("<base href=`"$expectedBaseHref`">")) 'The application shell did not render its IIS path base.'
+    $manifest = $adminClient.GetAsync("$applicationUrl/manifest.webmanifest").GetAwaiter().GetResult()
     Assert-True $manifest.IsSuccessStatusCode 'The PWA manifest is not available.'
-    $serviceWorker = $adminClient.GetAsync("$baseUrl/service-worker.js").GetAwaiter().GetResult()
+    $manifestText = $manifest.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+    Assert-True ($manifestText.Contains('"start_url": "./"') -and $manifestText.Contains('"scope": "./"')) 'The PWA manifest is not scoped relatively to the IIS application.'
+    $script = $adminClient.GetAsync("$applicationUrl/app.js").GetAwaiter().GetResult()
+    Assert-True $script.IsSuccessStatusCode 'The client application script is not available under the IIS path base.'
+    $style = $adminClient.GetAsync("$applicationUrl/styles.css").GetAwaiter().GetResult()
+    Assert-True $style.IsSuccessStatusCode 'The application stylesheet is not available under the IIS path base.'
+    $serviceWorker = $adminClient.GetAsync("$applicationUrl/service-worker.js").GetAwaiter().GetResult()
     Assert-True $serviceWorker.IsSuccessStatusCode 'The service worker is not available.'
+    $serviceWorkerText = $serviceWorker.Content.ReadAsStringAsync().GetAwaiter().GetResult()
+    if ($PathBase) { Assert-True ($serviceWorkerText.Contains("new URL('api/', APP_BASE_URL)")) 'The service worker API exclusion is not application scoped.' }
 
     $initial = Invoke-JsonApi -Client $adminClient -Method GET -Path '/api/status'
     Assert-True $initial.setupRequired 'The first-run wizard should appear on a new installation.'
@@ -312,7 +331,7 @@ try {
     for ($attempt = 0; $attempt -lt 60; $attempt++) {
         if ($process.HasExited) { throw 'The application exited during the restart persistence check.' }
         try {
-            $health = Invoke-RestMethod -Uri "$baseUrl/health" -TimeoutSec 2
+            $health = Invoke-RestMethod -Uri "$applicationUrl/health" -TimeoutSec 2
             if ($health.status -eq 'ok') { $ready = $true; break }
         } catch { Start-Sleep -Milliseconds 500 }
     }
@@ -329,7 +348,8 @@ try {
 
     Assert-True ((Get-Content -LiteralPath $caPemPath -Raw).StartsWith('-----BEGIN CERTIFICATE-----')) 'CA PEM export is invalid.'
 
-    Write-Output 'PASS: setup, authentication, CSRF gate, CA generation and both import formats, server SAN issuance, all exports, registration approval, user access control, SMTP secrecy, restart persistence and protected-key recovery.'
+    $pathDescription = if ($PathBase) { $PathBase } else { '/' }
+    Write-Output "PASS: $pathDescription path base, app shell/PWA assets, setup, authentication, CSRF gate, CA generation and both import formats, server SAN issuance, all exports, registration approval, user access control, SMTP secrecy, restart persistence and protected-key recovery."
 } catch {
     if (Test-Path -LiteralPath $logErr) {
         $logTail = Get-Content -LiteralPath $logErr -Tail 40 -ErrorAction SilentlyContinue
@@ -346,5 +366,6 @@ try {
     if ($null -eq $previousData) { Remove-Item Env:\CAWEB_DATA_DIR -ErrorAction SilentlyContinue } else { $env:CAWEB_DATA_DIR = $previousData }
     if ($null -eq $previousEnvironment) { Remove-Item Env:\ASPNETCORE_ENVIRONMENT -ErrorAction SilentlyContinue } else { $env:ASPNETCORE_ENVIRONMENT = $previousEnvironment }
     if ($null -eq $previousUrls) { Remove-Item Env:\ASPNETCORE_URLS -ErrorAction SilentlyContinue } else { $env:ASPNETCORE_URLS = $previousUrls }
+    if ($null -eq $previousPathBase) { Remove-Item Env:\CAWEB_TEST_PATH_BASE -ErrorAction SilentlyContinue } else { $env:CAWEB_TEST_PATH_BASE = $previousPathBase }
     if (Test-Path -LiteralPath $testDirectory) { Remove-Item -LiteralPath $testDirectory -Recurse -Force }
 }

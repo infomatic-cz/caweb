@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 — 2026-10-23
+
+- Oprava routování pod IIS cestou /caweb a instalace jako podaplikace existujícího HTTPS webu
+
+## 0.1.2 — 2026-10-23
+
+- Instalace jako podaplikace /caweb pod existujícím IIS webem
+
 ## 0.1.1 — 2026-10-23
 
 - První provozní sestavení aplikace CAWeb pro IIS

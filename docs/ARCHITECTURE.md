@@ -2,7 +2,7 @@
 
 ## Přehled
 
-CAWeb je .NET 10 ASP.NET Core aplikace bez externího frontendového frameworku. Prohlížeč obsluhuje soubory z `wwwroot/` a volá stejno-origin API `/api`. Výchozí provozní datový adresář je `%ProgramData%\CAWeb\data`; cestu lze nastavit proměnnou procesu `CAWEB_DATA_DIR`.
+CAWeb je .NET 10 ASP.NET Core aplikace bez externího frontendového frameworku. Prohlížeč obsluhuje soubory z `wwwroot/` a volá stejno-origin API pod aktuální `PathBase`, například `/caweb/api`. IIS předává podcestu podaplikace jako `PathBase`; server ji vloží do kořenové stránky a klient z ní odvozuje adresy API, PWA manifestu, servisního workeru a statických souborů. Výchozí provozní datový adresář je `%ProgramData%\CAWeb\data`; cestu lze nastavit proměnnou procesu `CAWEB_DATA_DIR`.
 
 | Oblast | Implementace |
 | --- | --- |
@@ -35,5 +35,5 @@ CA key material and server key material are decrypted only for the operation tha
 
 - Aplikace záměrně drží pouze jednu aktuální CA. Změna CA označí staré certifikáty stavem `CA changed`; nová serverová sada a distribuce důvěryhodného kořene jsou samostatná operace.
 - Certifikáty nejsou automaticky instalovány na vzdálené servery. Uživatel importuje připravený PFX/P12 do IIS/Tomcat.
-- Provozujte aplikaci pouze přes HTTPS. `Install-IIS.ps1` zakládá HTTPS binding, odstraňuje HTTP binding a vyžaduje existující certifikát pro administrační web.
+- Provozujte aplikaci pod existujícím IIS webem přes jeho HTTPS binding. `Install-IIS.ps1` vytvoří vlastní pool a podaplikaci `/caweb`; nepřidává ani neupravuje binding, hostname, certifikát ani kořenovou aplikaci.
 - Data Protection key ring pod datovým adresářem a SQLite jsou svázané s tímto Windows serverem přes DPAPI LocalMachine. Záloha musí zahrnovat obojí, nebo je třeba uchovávat CA mimo aplikaci.
