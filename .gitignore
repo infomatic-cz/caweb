@@ -1,0 +1,29 @@
+# Certificate material and local operator data must never enter source control.
+Podklady/**
+Pracovní/**
+data/**
+App_Data/**
+*.db
+*.db-shm
+*.db-wal
+*.pfx
+*.p12
+*.key
+*.pem
+*.crt
+*.cer
+*.der
+.env
+.env.*
+!.env.example
+
+# Build and IDE output (all builds are redirected to C:\Temp\CAWeb-Build).
+bin/
+obj/
+.vs/
+.idea/
+*.user
+*.suo
+*.log
+Thumbs.db
+.DS_Store
