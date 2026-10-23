@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 — 2026-10-23
+
+- První provozní sestavení aplikace CAWeb pro IIS
+
 ## 0.1.0 — 2026-10-23
 
 - Založena dvojjazyčná ASP.NET Core aplikace CAWeb pro správu certifikační autority a serverových TLS certifikátů.

@@ -1,4 +1,4 @@
-const CACHE = 'caweb-shell-0.1.0';
+const CACHE = 'caweb-shell-0.1.1';
 const SHELL = ['/', '/index.html', '/styles.css', '/app.js', '/manifest.webmanifest', '/favicon.svg'];
 
 self.addEventListener('install', event => {
