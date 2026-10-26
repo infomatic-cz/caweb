@@ -1,16 +1,15 @@
 ﻿[CmdletBinding()]
 param(
-    [Parameter(Mandatory)]
     [string] $PackagePath,
 
     # Name of the EXISTING IIS website, not a server hostname or URL.
-    [string] $SiteName,
+    [string] $SiteName = 'Default Web Site',
 
     [string] $ApplicationPath = 'caweb',
     [string] $AppPoolName = 'CAWeb',
     [string] $ServiceAccount,
     [switch] $UseApplicationPoolIdentity,
-    [Alias('SiteRoot')] [string] $InstallRoot,
+    [Alias('SiteRoot')] [string] $InstallRoot = 'C:\Apps\CAWeb',
     [string] $DataPath = 'C:\ProgramData\CAWeb\data'
 )
 
@@ -300,12 +299,41 @@ function Get-InstallRoot {
     return $full
 }
 
+function Resolve-PackagePath {
+    param([string] $RequestedPath)
+    if (-not [string]::IsNullOrWhiteSpace($RequestedPath)) {
+        return (Resolve-Path -LiteralPath $RequestedPath -ErrorAction Stop).Path
+    }
+
+    $workingDirectory = (Get-Location).Path
+    $packages = @(
+        Get-ChildItem -LiteralPath $workingDirectory -Filter 'CAWeb-*-win-x64.zip' -File -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                $match = [regex]::Match($_.Name, '^CAWeb-(\d+\.\d+\.\d+)-win-x64\.zip$')
+                if ($match.Success) {
+                    [pscustomobject]@{
+                        Path = $_.FullName
+                        Version = [version]$match.Groups[1].Value
+                        LastWriteTime = $_.LastWriteTime
+                    }
+                }
+            }
+    )
+    if ($packages.Count -eq 0) {
+        throw "No CAWeb-<version>-win-x64.zip was found in the current directory '$workingDirectory'. Copy the release ZIP here or pass -PackagePath explicitly."
+    }
+
+    $selectedPackage = $packages | Sort-Object @{ Expression = 'Version'; Descending = $true }, @{ Expression = 'LastWriteTime'; Descending = $true } | Select-Object -First 1
+    Write-Host "Using latest CAWeb package $($selectedPackage.Version): $($selectedPackage.Path)" -ForegroundColor Cyan
+    return $selectedPackage.Path
+}
+
 Assert-Administrator
 Initialize-IisNative
 Initialize-IisPoolApi
-$siteRootPath = Get-InstallRoot -RequestedRoot $InstallRoot -DefaultRoot 'C:\inetpub\CAWeb' -ApplicationLabel 'CAWeb'
+$siteRootPath = Get-InstallRoot -RequestedRoot $InstallRoot -DefaultRoot 'C:\Apps\CAWeb' -ApplicationLabel 'CAWeb'
 
-$archive = (Resolve-Path -LiteralPath $PackagePath -ErrorAction Stop).Path
+$archive = Resolve-PackagePath -RequestedPath $PackagePath
 if ([IO.Path]::GetExtension($archive) -ine '.zip') { throw 'PackagePath must point to the CAWeb release ZIP.' }
 $AppPoolName = $AppPoolName.Trim()
 if ($AppPoolName -notmatch '^[A-Za-z0-9_.-]{1,64}$') { throw 'AppPoolName must contain only letters, numbers, dot, underscore or hyphen.' }

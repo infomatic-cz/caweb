@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7 — 2026-10-26
+
+- Zjednodušení instalace bez parametrů: automatický výběr nejvyššího ZIPu, Default Web Site a C:\Apps\CAWeb
+
 ## 0.1.6 — 2026-10-26
 
 - Oprava úpravy environmentVariables v IIS web.config přes XML DOM místo PowerShell property adapteru

@@ -18,9 +18,10 @@ lze misto dotazu zadat volitelne -ServerHost "server.firma.cz".
 
 1. CAWEB
 ---------
-pwsh.exe -NoProfile -ExecutionPolicy Bypass -File C:\Transfer\Install-CAWeb.ps1 -PackagePath "C:\Transfer\CAWeb-0.1.6-win-x64.zip" -InstallRoot "C:\inetpub\CAWeb"
+Set-Location C:\Transfer
+.\Install-CAWeb.ps1
 
-Pokud je na IIS vice spustenych webu s HTTPS, doplnte -SiteName "Default Web Site".
+Vychozi web je "Default Web Site". Pro jiny existujici web zadejte volitelne -SiteName "Nazev webu". ZIP se automaticky vybere z aktualni slozky podle nejvyssi verze.
 CAWeb nevyzaduje zadani URL ani zmeny TLS vazby nebo certifikatu existujiciho webu.
 
 2. TTA MCP
@@ -31,7 +32,7 @@ TTA MCP vyzaduje IIS HttpPlatformHandler a x64 Node.js odpovidajici
 release. CAWeb vyzaduje .NET 10 ASP.NET Core Hosting Bundle.
 
 U OBOU SKRIPTU:
-- Pokud u CAWeb neni zadano -InstallRoot, skript se zepta na korenovou slozku,
+- CAWeb pouzije bez parametru cilovou slozku C:\Apps\CAWeb; TTA MCP se pri vynechani -InstallRoot zepta na korenovou slozku,
   kam se ukladaji jednotlive verze jako <root>\releases\<version>.
 - Volitelny parametr -ServiceAccount "DOMENA\svc_name" nastavi identitu
   aplikacniho poolu. Heslo se zada pri instalaci skrytym vstupem.

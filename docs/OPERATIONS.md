@@ -12,7 +12,7 @@ Samotná SQLite záloha bez složky `keys` neumí dešifrovat uložené privátn
 
 ## Obnova aplikace
 
-- Zkopírujte nový instalační ZIP a `Install-CAWeb.ps1` na server a spusťte instalační skript z 64bitového PowerShellu 7 jako správce. Při aktualizaci použijte `pwsh.exe -NoProfile -File .\Install-CAWeb.ps1 -PackagePath <ZIP> -InstallRoot C:\inetpub\CAWeb`. Skript rozbalí novou verzi do `C:\inetpub\CAWeb\releases\<verze>` a přesměruje pouze IIS podaplikaci `/caweb`.
+- Zkopírujte nový instalační ZIP a `Install-CAWeb.ps1` do jedné složky na serveru. Z 64bitového PowerShellu 7 spuštěného jako správce přejděte do této složky a spusťte `.\Install-CAWeb.ps1` bez parametrů. Vybere nejvyšší verzi ZIPu, použije `Default Web Site` a instaluje do `C:\Apps\CAWeb\releases\<verze>`. Pro jiný web nebo cestu lze zadat `-SiteName` nebo `-InstallRoot`.
 - Ponechte oddělený pool `CAWeb` a data v `%ProgramData%\CAWeb\data`; skript nemění kořenový web ani jeho HTTPS binding.
 - Pokud se server měnil, obnovte DPAPI/Data Protection klíče na odpovídající Windows instanci. Bez nich databáze zůstane čitelná, ale šifrovaná pole zůstanou nedostupná.
 - Podaplikaci připojte zpět pod `/caweb` na existujícím IIS webu a otestujte `https://<host>/caweb/health`, přihlášení, metadata CA a vydání testovacího certifikátu.

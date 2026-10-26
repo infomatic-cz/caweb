@@ -144,8 +144,28 @@ $null = New-Item -ItemType Directory -Path $artifactsPath -Force
 if ($LASTEXITCODE -ne 0) { throw 'JavaScript syntax validation failed.' }
 $parseErrors = $null
 $parseTokens = $null
-[void] [Management.Automation.Language.Parser]::ParseFile((Join-Path $sourceRoot 'Install-CAWeb.ps1'), [ref]$parseTokens, [ref]$parseErrors)
+$installerAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $sourceRoot 'Install-CAWeb.ps1'), [ref]$parseTokens, [ref]$parseErrors)
 if ($parseErrors.Count -gt 0) { throw "Install-CAWeb.ps1 has a PowerShell parse error: $($parseErrors[0].Message)" }
+$packageSelectorAst = $installerAst.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Resolve-PackagePath' }, $true)
+if ($null -eq $packageSelectorAst) { throw 'Install-CAWeb.ps1 is missing Resolve-PackagePath.' }
+. ([scriptblock]::Create($packageSelectorAst.Extent.Text))
+$selectorTestPath = Join-Path $testsPath 'package-selection'
+$null = New-Item -ItemType Directory -Path $selectorTestPath -Force
+foreach ($testVersion in @('0.1.9', '0.1.10', '0.1.8')) {
+    $testZip = Join-Path $selectorTestPath "CAWeb-$testVersion-win-x64.zip"
+    $null = New-Item -ItemType File -Path $testZip -Force
+}
+Push-Location -LiteralPath $selectorTestPath
+try {
+    $selectedPackage = Resolve-PackagePath
+    if ([IO.Path]::GetFileName($selectedPackage) -ne 'CAWeb-0.1.10-win-x64.zip') {
+        throw "The installer did not select the highest semantic package version. Selected: $selectedPackage"
+    }
+    $explicitPackage = Resolve-PackagePath -RequestedPath (Join-Path $selectorTestPath 'CAWeb-0.1.9-win-x64.zip')
+    if ([IO.Path]::GetFileName($explicitPackage) -ne 'CAWeb-0.1.9-win-x64.zip') {
+        throw 'The installer did not honor an explicit PackagePath override.'
+    }
+} finally { Pop-Location }
 $parseErrors = $null
 $parseTokens = $null
 [void] [Management.Automation.Language.Parser]::ParseFile((Join-Path $sourceRoot 'tests\Smoke-Test.ps1'), [ref]$parseTokens, [ref]$parseErrors)

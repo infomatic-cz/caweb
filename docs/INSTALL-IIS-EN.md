@@ -11,25 +11,23 @@ CAWeb is installed as a separate IIS sub-application under an existing website, 
 
 ## Install
 
-1. Copy `CAWeb-0.1.6-win-x64.zip` and `Install-CAWeb.ps1` from `C:\Temp\CAWeb-Build\artifacts` to the server, for example `C:\Transfer`.
-2. Open 64-bit PowerShell 7 (`pwsh.exe`) **as Administrator** and run:
+1. Copy the current `CAWeb-<version>-win-x64.zip` and `Install-CAWeb.ps1` from `C:\Temp\CAWeb-Build\artifacts` into one folder on the server, for example `C:\Transfer`.
+2. Open 64-bit PowerShell 7 (`pwsh.exe`) **as Administrator**, change to that folder, and run the script without arguments:
 
 ```powershell
-pwsh.exe -NoProfile -ExecutionPolicy Bypass -File C:\Transfer\Install-CAWeb.ps1 `
-  -PackagePath C:\Transfer\CAWeb-0.1.6-win-x64.zip `
-  -InstallRoot C:\inetpub\CAWeb
+Set-Location C:\Transfer
+.\Install-CAWeb.ps1
 ```
 
-If IIS has only one running website with HTTPS, the installer selects it automatically. If there are multiple, add `-SiteName` with the target website name shown in IIS Manager. This is the IIS website name, not a URL or hostname:
+With no arguments, the script selects the ZIP with the highest version in the current folder, uses the existing IIS website `Default Web Site`, and installs to `C:\Apps\CAWeb`. The website name is not a URL or hostname. Keep the ZIP and script in the same folder and run the command from that folder.
+
+To use a different IIS website or folder, override the defaults:
 
 ```powershell
-pwsh.exe -NoProfile -ExecutionPolicy Bypass -File C:\Transfer\Install-CAWeb.ps1 `
-  -PackagePath C:\Transfer\CAWeb-0.1.6-win-x64.zip `
-  -InstallRoot C:\inetpub\CAWeb `
-  -SiteName 'Name of the existing IIS website'
+.\Install-CAWeb.ps1 -SiteName 'IIS website name' -InstallRoot 'D:\Apps\CAWeb'
 ```
 
-The installer extracts the version to `C:\inetpub\CAWeb\releases\<version>`, creates a dedicated `CAWeb` application pool with `ApplicationPoolIdentity`, and attaches it to the existing website as `/caweb`. The database and keys are stored outside the website in `%ProgramData%\CAWeb\data`, with a restricted ACL for the pool identity, SYSTEM, and Windows administrators.
+To select a different ZIP explicitly, pass `-PackagePath 'C:\path\CAWeb-0.1.7-win-x64.zip'`. The installer extracts the version to `C:\Apps\CAWeb\releases\<version>`, creates a dedicated `CAWeb` application pool with `ApplicationPoolIdentity`, and attaches it to the existing website as `/caweb`. The database and keys are stored outside the website in `%ProgramData%\CAWeb\data`, with a restricted ACL for the pool identity, SYSTEM, and Windows administrators.
 
 For a new installation, you can optionally set the pool identity with `-ServiceAccount 'DOMAIN\user'`. The installer prompts for the password securely; don't put it on the command line. During upgrades, it preserves the current identity. Use `-UseApplicationPoolIdentity` to explicitly switch back to the IIS application pool identity.
 
@@ -50,7 +48,7 @@ Invoke-RestMethod https://<same-host-as-the-parent-website>/caweb/health
 
 ## Update
 
-Copy the newer ZIP and `Install-CAWeb.ps1` to the server and run it again from 64-bit PowerShell 7 as Administrator. The installer adds a new versioned release folder and switches only the `/caweb` application to it. The database, Data Protection keys, parent website, HTTPS binding, and other applications are preserved. Keep previous release folders for rollback.
+Copy the newer ZIP and `Install-CAWeb.ps1` into the same current folder on the server and run `.\Install-CAWeb.ps1` again from 64-bit PowerShell 7 as Administrator. It selects the highest ZIP version, adds a new versioned release folder, and switches only `/caweb` to it. The database, Data Protection keys, parent website, HTTPS binding, and other applications are preserved. Keep previous release folders for rollback.
 
 ## Backup and restore
 

@@ -11,25 +11,23 @@ CAWeb se instaluje jako samostatná IIS podaplikace pod již běžící web, nap
 
 ## Instalace
 
-1. Zkopírujte `CAWeb-0.1.6-win-x64.zip` a `Install-CAWeb.ps1` z `C:\Temp\CAWeb-Build\artifacts` na server, například do `C:\Transfer`.
-2. Otevřete 64bitový PowerShell 7 (`pwsh.exe`) **jako správce** a spusťte:
+1. Zkopírujte aktuální `CAWeb-<verze>-win-x64.zip` a `Install-CAWeb.ps1` z `C:\Temp\CAWeb-Build\artifacts` do jedné složky na serveru, například `C:\Transfer`.
+2. Otevřete 64bitový PowerShell 7 (`pwsh.exe`) **jako správce**, přejděte do složky se soubory a spusťte skript bez parametrů:
 
 ```powershell
-pwsh.exe -NoProfile -ExecutionPolicy Bypass -File C:\Transfer\Install-CAWeb.ps1 `
-  -PackagePath C:\Transfer\CAWeb-0.1.6-win-x64.zip `
-  -InstallRoot C:\inetpub\CAWeb
+Set-Location C:\Transfer
+.\Install-CAWeb.ps1
 ```
 
-Pokud je na IIS jediný spuštěný web s HTTPS, instalátor jej vybere automaticky. Pokud je jich více, přidejte `-SiteName` s názvem cílového webu z IIS Manageru. Jde o název webu v IIS, nikoli o URL nebo hostname:
+Bez parametrů skript vybere ZIP s nejvyšší verzí v aktuální složce, použije existující IIS web `Default Web Site` a cílovou složku `C:\Apps\CAWeb`. Název webu není URL ani hostname. ZIP a skript proto před spuštěním umístěte do stejné složky a spusťte příkaz v ní.
+
+Pokud chcete jiný IIS web nebo složku, můžete výchozí hodnoty přepsat:
 
 ```powershell
-pwsh.exe -NoProfile -ExecutionPolicy Bypass -File C:\Transfer\Install-CAWeb.ps1 `
-  -PackagePath C:\Transfer\CAWeb-0.1.6-win-x64.zip `
-  -InstallRoot C:\inetpub\CAWeb `
-  -SiteName 'Název existujícího webu v IIS'
+.\Install-CAWeb.ps1 -SiteName 'Název webu v IIS' -InstallRoot 'D:\Apps\CAWeb'
 ```
 
-Instalátor rozbalí verzi do `C:\inetpub\CAWeb\releases\<verze>`, vytvoří samostatný pool `CAWeb` s identitou `ApplicationPoolIdentity` a připojí jej k existujícímu webu jako aplikaci `/caweb`. Databázi a klíče ukládá mimo web do `%ProgramData%\CAWeb\data` s omezeným ACL pro identitu poolu, SYSTEM a správce Windows.
+Pro jiný ZIP lze také použít `-PackagePath 'C:\cesta\CAWeb-0.1.7-win-x64.zip'`. Instalátor rozbalí verzi do `C:\Apps\CAWeb\releases\<verze>`, vytvoří samostatný pool `CAWeb` s identitou `ApplicationPoolIdentity` a připojí jej k existujícímu webu jako aplikaci `/caweb`. Databázi a klíče ukládá mimo web do `%ProgramData%\CAWeb\data` s omezeným ACL pro identitu poolu, SYSTEM a správce Windows.
 
 Volitelně lze pro novou instalaci nastavit identitu poolu parametrem `-ServiceAccount 'DOMENA\uzivatel'`. Heslo se vyžádá skrytým vstupem; nezadávejte ho do příkazové řádky. Při aktualizaci se aktuální identita zachová. Parametrem `-UseApplicationPoolIdentity` ji lze výslovně přepnout zpět na identitu poolu IIS.
 
@@ -50,7 +48,7 @@ Invoke-RestMethod https://<stejný-host-jako-kořenový-web>/caweb/health
 
 ## Aktualizace
 
-Zkopírujte novější ZIP a `Install-CAWeb.ps1` na server a spusťte stejný příkaz z 64bitového PowerShellu 7 jako správce. Instalátor přidá novou verzovanou složku a přepne na ni pouze aplikaci `/caweb`. Databáze, Data Protection klíče, kořenový web, HTTPS binding i ostatní aplikace zůstanou zachované. Starší release složky ponechte pro návrat.
+Zkopírujte novější ZIP a `Install-CAWeb.ps1` do aktuální složky na serveru a spusťte `.\Install-CAWeb.ps1` z 64bitového PowerShellu 7 jako správce. Skript automaticky vybere nejvyšší verzi ZIPu, přidá novou verzovanou složku a přepne na ni pouze aplikaci `/caweb`. Databáze, Data Protection klíče, kořenový web, HTTPS binding i ostatní aplikace zůstanou zachované. Starší release složky ponechte pro návrat.
 
 ## Zálohování a obnova
 

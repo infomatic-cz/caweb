@@ -35,7 +35,7 @@ Skript zvedne patch verzi, doplní `CHANGELOG.md`, vytvoří self-contained Wind
 
 ## Nasazení pod existující IIS web
 
-Instalační skript připojí aplikaci jako samostatnou IIS podaplikaci `/caweb` a vytvoří jí vlastní aplikační pool. Automaticky vybere jediný spuštěný web s existujícím HTTPS bindingem; pokud jich IIS hostí více, lze vybrat cílový **název webu v IIS** pomocí `-SiteName`. Nezadává se hostname ani certifikát a kořenový web, jeho HTTPS bindingy ani další aplikace se nemění. Detaily jsou v [postupu nasazení](docs/INSTALL-IIS-CS.md).
+Instalační skript připojí aplikaci jako samostatnou IIS podaplikaci `/caweb` pod existující `Default Web Site` a vytvoří jí vlastní aplikační pool. Bez parametrů vybere nejvyšší verzi ZIPu `CAWeb-*-win-x64.zip` v aktuální složce a instaluje ji do `C:\Apps\CAWeb`. Nezadává se hostname ani certifikát a kořenový web, jeho HTTPS bindingy ani další aplikace se nemění. Název webu a cílovou složku lze přepsat parametry `-SiteName` a `-InstallRoot`. Detaily jsou v [postupu nasazení](docs/INSTALL-IIS-CS.md).
 
 ## Aktuální rozsah
 
