@@ -22,6 +22,9 @@ public static class Program
         var builder = WebApplication.CreateBuilder(args);
         var dataDirectory = ResolveDataDirectory(builder.Environment);
         Directory.CreateDirectory(dataDirectory);
+        var operationalLogs = new OperationalLogStore(Path.Combine(dataDirectory, "logs"));
+        builder.Services.AddSingleton(operationalLogs);
+        builder.Logging.AddProvider(new OperationalLogProvider(operationalLogs));
 
         builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = 15 * 1024 * 1024);
         var dataProtection = builder.Services.AddDataProtection()
@@ -110,11 +113,13 @@ public static class Program
             }
             catch (Exception exception)
             {
-                app.Logger.LogError(exception, "Unhandled application error.");
+                var referenceId = Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
+                app.Logger.LogError(exception, "Unhandled application error. ReferenceId={ReferenceId}; Method={Method}; Path={Path}",
+                    referenceId, context.Request.Method, context.Request.Path);
                 if (context.Response.HasStarted) throw;
                 context.Response.Clear();
                 context.Response.StatusCode = StatusCodes.Status500InternalServerError;
-                await context.Response.WriteAsJsonAsync(new { error = "server_error" });
+                await context.Response.WriteAsJsonAsync(new { error = "server_error", referenceId });
             }
         });
 
@@ -248,6 +253,11 @@ public static class Program
         });
 
         api.MapGet("/me", (HttpContext context) => Results.Ok(PublicUser(CurrentUser(context))));
+        api.MapGet("/logs", (HttpContext context) =>
+        {
+            if (!IsAdmin(CurrentUser(context))) return Results.Forbid();
+            return Results.Ok(operationalLogs.ReadRecent());
+        });
         api.MapPut("/me/language", async (LanguageRequest input, HttpContext context, CancellationToken cancellationToken) =>
         {
             if (!InputValidation.IsValidLanguage(input.Language)) throw new AppValidationException("invalid_language");
@@ -597,7 +607,7 @@ public static class Program
     private static CaSummary ToAuthoritySummary(CertificateAuthorityRecord authority, int serverCount)
     {
         using var certificate = AuthorityCertificate(authority);
-        return new CaSummary(authority.Subject, authority.Thumbprint, authority.KeyAlgorithm, authority.NotBefore, authority.NotAfter,
+        return new CaSummary(authority.Subject, authority.Thumbprint, CertificateService.PublicKeyFingerprint(certificate), authority.KeyAlgorithm, authority.NotBefore, authority.NotAfter,
             authority.Imported, authority.NotAfter <= DateTimeOffset.UtcNow, certificate.SerialNumber, serverCount);
     }
 

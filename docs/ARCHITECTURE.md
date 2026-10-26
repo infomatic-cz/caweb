@@ -13,11 +13,12 @@ CAWeb je .NET 10 ASP.NET Core aplikace bez externího frontendového frameworku.
 | Privátní klíče a SMTP heslo | Šifrované sloupce SQLite pomocí ASP.NET Core Data Protection |
 | Data Protection key ring | `%ProgramData%\CAWeb\data\keys`, šifrování DPAPI LocalMachine, přístup pro aplikační pool, SYSTEM a správce Windows |
 | Audit | Změny účtů, CA a certifikátů; bez hesel a klíčového materiálu |
+| Provozní záznamy | Strukturované varování a chyby v `%ProgramData%\CAWeb\data\logs`, omezené soubory s 30denní retencí; posledních 100 záznamů vidí správce v Nastavení |
 | Ochranné hlavičky | CSP, `nosniff`, `DENY`, `no-referrer`, HSTS mimo Development |
 
 ## Toky certifikátů
 
-1. CA import přijímá PFX/P12 s privátním klíčem nebo certifikát PEM/DER spolu s klíčem PEM. Heslo použité k importu se zahodí po načtení. Aplikace ověří CA basic constraints, případné Key Usage, platnost a shodu klíče s certifikátem.
+1. CA import přijímá PFX/P12 s privátním klíčem nebo certifikát PEM/DER spolu s klíčem PEM. Heslo použité k importu se zahodí po načtení. Aplikace ověří CA basic constraints, případné Key Usage, platnost a shodu klíče s certifikátem. Rozhraní ukazuje SHA-1 otisk certifikátu a SHA-256 otisk veřejného klíče, aby šlo přesně určit, zda se importuje stejná CA, obnovený certifikát se stejným klíčem, nebo nový klíč.
 2. Soukromý klíč se normalizuje na PKCS#8, zašifruje pomocí účelově odděleného Data Protection purpose a uloží do SQLite. Certifikát se ukládá jako veřejné DER.
 3. Vydání serverového certifikátu vygeneruje nový RSA 3072 nebo ECDSA P-256 klíč. CSR nahrazuje přímo vytvořený požadavek `CertificateRequest`; vytvořené SAN zahrnují DNS/IP a CN. Do certifikátu se přidá `serverAuth`, základní omezení `CA:false` a vybrané KeyUsage.
 4. Certifikát a klíč se uloží do aplikace chráněné úložiště. PFX/P12 s privátním klíčem a pouze veřejným kořenovým certifikátem se ihned stáhne pod heslem zadaným správcem. Heslo se neukládá.
@@ -37,3 +38,4 @@ CA key material and server key material are decrypted only for the operation tha
 - Certifikáty nejsou automaticky instalovány na vzdálené servery. Uživatel importuje připravený PFX/P12 do IIS/Tomcat.
 - Provozujte aplikaci pod existujícím IIS webem přes jeho HTTPS binding. `Install-CAWeb.ps1` vytvoří vlastní pool a podaplikaci `/caweb`; nepřidává ani neupravuje binding, hostname, certifikát ani kořenovou aplikaci.
 - Data Protection key ring pod datovým adresářem a SQLite jsou svázané s tímto Windows serverem přes DPAPI LocalMachine. Záloha musí zahrnovat obojí, nebo je třeba uchovávat CA mimo aplikaci.
+- Neočekávané výjimky dostanou referenční ID vrácené klientovi a uložené v provozních záznamech. Záznamy neobsahují těla požadavků, hesla ani privátní klíče; podrobnosti a stack trace jsou dostupné správci přes `/api/logs` a obrazovku Nastavení.

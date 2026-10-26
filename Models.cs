@@ -123,6 +123,7 @@ public sealed record CaImportResult(string Mode, string? Password);
 public sealed record CaSummary(
     string Subject,
     string Thumbprint,
+    string PublicKeyFingerprint,
     string KeyAlgorithm,
     DateTimeOffset NotBefore,
     DateTimeOffset NotAfter,

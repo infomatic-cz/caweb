@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.8 — 2026-10-26
+
+- Oprava rozlišení importované CA, podpora IPv6 v SAN, viditelné chyby formulářů a provozní záznamy
+
 ## 0.1.7 — 2026-10-26
 
 - Zjednodušení instalace bez parametrů: automatický výběr nejvyššího ZIPu, Default Web Site a C:\Apps\CAWeb

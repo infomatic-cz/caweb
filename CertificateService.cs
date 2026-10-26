@@ -212,6 +212,15 @@ public static class CertificateService
         return constraints?.CertificateAuthority == true;
     }
 
+    public static string PublicKeyFingerprint(X509Certificate2 certificate)
+    {
+        using var rsa = certificate.GetRSAPublicKey();
+        using var ecdsa = certificate.GetECDsaPublicKey();
+        var publicKey = rsa?.ExportSubjectPublicKeyInfo() ?? ecdsa?.ExportSubjectPublicKeyInfo()
+            ?? throw new AppValidationException("unsupported_ca_key");
+        return Convert.ToHexString(SHA256.HashData(publicKey));
+    }
+
     private static CertificateMaterial ToMaterial(X509Certificate2 certificate, AsymmetricAlgorithm key, string algorithm, bool imported, IDataProtector protector)
     {
         if (!IsCertificateAuthority(certificate)) throw new AppValidationException("certificate_not_ca");

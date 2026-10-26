@@ -273,6 +273,16 @@ a { color: var(--blue); }
 .dialog-close { display: grid; width: 31px; height: 31px; flex: 0 0 auto; place-items: center; border: 1px solid var(--line); border-radius: 8px; color: #617388; background: #fff; }
 .dialog-close .icon { width: 15px; height: 15px; }
 .dialog-body { padding: 20px 22px 22px; }
+.dialog-error { margin: 0 0 16px; scroll-margin-top: 76px; }
+.operational-logs { margin-top: 15px; }
+.operational-log-list { display: grid; gap: 10px; }
+.operational-log { border: 1px solid var(--line); border-radius: 9px; padding: 12px; background: #fbfcfe; }
+.operational-log-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 5px 15px; color: var(--muted); font-size: 10px; }
+.operational-log-message { margin-top: 7px; color: var(--ink); font-size: 11px; overflow-wrap: anywhere; }
+.operational-log details { margin-top: 10px; color: var(--muted); font-size: 10px; }
+.operational-log summary { cursor: pointer; }
+.operational-log pre { max-height: 420px; overflow: auto; margin: 8px 0 0; border-radius: 7px; padding: 10px; color: #dce8f5; background: #14283b; font-size: 10px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.operational-logs-empty { margin: 0; color: var(--muted); font-size: 11px; }
 .dialog-body .form-actions { padding-top: 16px; border-top: 1px solid var(--line); }
 .toast-region { position: fixed; z-index: 20; right: 19px; bottom: 18px; display: grid; gap: 8px; width: min(370px, calc(100vw - 34px)); pointer-events: none; }
 .toast { display: flex; align-items: flex-start; gap: 10px; border: 1px solid #dce5ee; border-radius: 11px; padding: 12px 14px; color: #31485f; background: #fff; box-shadow: var(--shadow); font-size: 11px; animation: toast-in .18s ease-out; }

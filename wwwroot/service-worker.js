@@ -1,4 +1,4 @@
-const CACHE = 'caweb-shell-0.1.7';
+const CACHE = 'caweb-shell-0.1.8';
 const APP_BASE_URL = new URL('./', self.registration.scope);
 const APP_BASE_PATH = APP_BASE_URL.pathname;
 const API_PATH_PREFIX = new URL('api/', APP_BASE_URL).pathname;

@@ -227,11 +227,17 @@ try {
         organization = 'CAWeb Test'
         organizationalUnit = 'QA'
         dnsNames = @('server.example.test')
-        ipAddresses = @('127.0.0.1')
+        ipAddresses = @('127.0.0.1', '2001:db8::25')
         keyUsage = @('digitalSignature', 'keyEncipherment')
         keyAlgorithm = 'RSA'
         validDays = 30
     }
+    $invalidIpInput = [ordered]@{}
+    foreach ($key in $serverInput.Keys) { $invalidIpInput[$key] = $serverInput[$key] }
+    $invalidIpInput['name'] = 'smoke-invalid-ip'
+    $invalidIpInput['ipAddresses'] = @('not-an-ip')
+    $invalidIp = Invoke-JsonApi -Client $adminClient -Method POST -Path '/api/servers' -Body $invalidIpInput -ExpectedStatus @(400)
+    Assert-True ($invalidIp.error -eq 'invalid_ip_address') 'An invalid IP address did not return its specific validation error.'
     $server = Invoke-JsonApi -Client $adminClient -Method POST -Path '/api/servers' -Body $serverInput -ExpectedStatus @(201)
     Assert-True ($server.status -eq 'not-issued') 'A newly created server should have no certificate.'
     Assert-True ($server.dnsNames -contains 'localhost') 'The CN was not automatically added to DNS SAN.'
@@ -245,6 +251,8 @@ try {
     Assert-True ($certificate.Subject -like '*CN=localhost*') 'The issued certificate has the wrong subject.'
     $san = $certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.17' } | Select-Object -First 1
     Assert-True ($null -ne $san -and $san.Format($true).Contains('server.example.test')) 'The issued certificate SAN does not contain the configured DNS name.'
+    $sanBytes = [Convert]::ToHexString($san.RawData)
+    Assert-True ($sanBytes.Contains('20010DB8000000000000000000000025')) 'The issued certificate SAN does not contain the configured IPv6 address.'
     $certificate.Dispose()
     $afterIssue = (Invoke-JsonApi -Client $adminClient -Method GET -Path '/api/servers')[0]
     Assert-True ($afterIssue.status -eq 'expiring') 'The issued certificate status should reflect its 30-day validity window.'
@@ -271,6 +279,7 @@ try {
     $originalThumbprint = $ca.authority.thumbprint
     $caImported = Invoke-MultipartApi -Client $adminClient -Path '/api/ca/import' -Fields @{ mode = 'pfx'; password = $caPassword; confirmReplacement = 'true' } -Files @(@{ Field = 'pfxFile'; Name = 'ca.p12'; Bytes = [IO.File]::ReadAllBytes($caPfxPath) })
     Assert-True ($caImported.authority.thumbprint -eq $originalThumbprint) 'PFX import changed the CA certificate.'
+    Assert-True ($caImported.authority.publicKeyFingerprint -eq $ca.authority.publicKeyFingerprint) 'Importing the same CA changed its public key fingerprint.'
 
     $caKeyPath = Join-Path $testDirectory 'ca.key'
     $null = Invoke-Download -Client $adminClient -Path '/api/ca/export' -Body @{ format = 'key'; password = $keyPassword } -OutputPath $caKeyPath
@@ -297,7 +306,9 @@ try {
     Assert-True ($pendingUser.status -eq 'pending') 'The registration request was not stored as pending.'
     $null = Invoke-JsonApi -Client $adminClient -Method POST -Path "/api/users/$($pendingUser.id)/decision" -Body @{ decision = 'approve' }
     $activeLogin = Invoke-JsonApi -Client $registrationClient -Method POST -Path '/api/login' -Body @{ username = $registration.username; password = $registrationPassword }
+
     Assert-True ($activeLogin.user.status -eq 'active') 'The approved user could not sign in.'
+    $userLogs = Invoke-JsonApi -Client $registrationClient -Method GET -Path '/api/logs' -ExpectedStatus @(403)
     $language = Invoke-JsonApi -Client $registrationClient -Method PUT -Path '/api/me/language' -Body @{ language = 'en' }
     Assert-True ($language.language -eq 'en') 'A user could not save a personal language preference.'
     $tomcatInput = [ordered]@{}
@@ -312,11 +323,17 @@ try {
 
     $smtpPassword = ([guid]::NewGuid().ToString('N') + 'Sm4!')
     $savedSettings = Invoke-JsonApi -Client $adminClient -Method PUT -Path '/api/settings' -Body @{
-        host = 'smtp.example.test'; port = 587; fromAddress = 'caweb@example.test'; username = 'smtp-user'; password = $smtpPassword; useTls = $true; registrationEnabled = $true
+        host = '127.0.0.1'; port = 1; fromAddress = 'caweb@example.test'; username = 'smtp-user'; password = $smtpPassword; useTls = $true; registrationEnabled = $true
     }
     $settings = Invoke-JsonApi -Client $adminClient -Method GET -Path '/api/settings'
     Assert-True ($savedSettings.smtpConfigured -and $settings.smtp.passwordSet) 'SMTP settings did not persist.'
     Assert-True (-not ($settings.smtp.PSObject.Properties.Name -contains 'password')) 'The SMTP password was returned by the settings API.'
+    $failedEmail = Invoke-JsonApi -Client $adminClient -Method POST -Path '/api/settings/test-email' -Body @{ recipient = 'admin@example.test' } -ExpectedStatus @(500)
+    Assert-True ($failedEmail.referenceId -match '^[A-F0-9]{12}$') 'An unexpected server error did not return a reference ID.'
+    $operationalLogs = Invoke-JsonApi -Client $adminClient -Method GET -Path '/api/logs'
+    $loggedFailure = $operationalLogs | Where-Object { $_.referenceId -eq $failedEmail.referenceId } | Select-Object -First 1
+    Assert-True ($null -ne $loggedFailure -and $loggedFailure.exceptionDetails) 'The server error was not available in the administrator log viewer.'
+    Assert-True (-not ((ConvertTo-Json $operationalLogs -Depth 10) -match [regex]::Escape($smtpPassword))) 'The SMTP password was written to operational logs.'
     Stop-Process -Id $process.Id -Force
     $process.WaitForExit()
     $databaseBytes = [IO.File]::ReadAllBytes((Join-Path $testData 'caweb.db'))
@@ -340,6 +357,8 @@ try {
     Assert-True ($persistedUser.username -eq 'admin') 'The admin session did not survive an application restart.'
     $persistedSettings = Invoke-JsonApi -Client $adminClient -Method GET -Path '/api/settings'
     Assert-True ($persistedSettings.smtp.passwordSet -and $persistedSettings.registrationEnabled) 'SMTP and registration settings did not survive an application restart.'
+    $persistedLogs = Invoke-JsonApi -Client $adminClient -Method GET -Path '/api/logs'
+    Assert-True (($persistedLogs | Where-Object { $_.referenceId -eq $failedEmail.referenceId }) -ne $null) 'Operational logs did not survive an application restart.'
     $persistedServers = Invoke-JsonApi -Client $adminClient -Method GET -Path '/api/servers'
     Assert-True ($persistedServers.Count -eq 2) 'Server records did not survive an application restart.'
     $persistedServerPfx = Join-Path $testDirectory 'server-after-restart.pfx'
@@ -349,7 +368,7 @@ try {
     Assert-True ((Get-Content -LiteralPath $caPemPath -Raw).StartsWith('-----BEGIN CERTIFICATE-----')) 'CA PEM export is invalid.'
 
     $pathDescription = if ($PathBase) { $PathBase } else { '/' }
-    Write-Output "PASS: $pathDescription path base, app shell/PWA assets, setup, authentication, CSRF gate, CA generation and both import formats, server SAN issuance, all exports, registration approval, user access control, SMTP secrecy, restart persistence and protected-key recovery."
+    Write-Output "PASS: $pathDescription path base, app shell/PWA assets, setup, authentication, CSRF gate, CA generation and both import formats, IPv4/IPv6 SAN issuance, protected operational logs, all exports, registration approval, user access control, SMTP secrecy, restart persistence and protected-key recovery."
 } catch {
     if (Test-Path -LiteralPath $logErr) {
         $logTail = Get-Content -LiteralPath $logErr -Tail 40 -ErrorAction SilentlyContinue
