@@ -166,6 +166,19 @@ if (-not (Test-Path -LiteralPath $publishedConfigPath -PathType Leaf)) { throw '
 $aspNetCoreNode = $publishedConfig.SelectSingleNode('/configuration/location/system.webServer/aspNetCore')
 if ($null -eq $aspNetCoreNode) { $aspNetCoreNode = $publishedConfig.SelectSingleNode('/configuration/system.webServer/aspNetCore') }
 if ($null -eq $aspNetCoreNode) { throw 'The published web.config has no ASP.NET Core handler node in its IIS configuration location.' }
+$environmentVariablesNode = $aspNetCoreNode.SelectSingleNode('./environmentVariables')
+if ($null -eq $environmentVariablesNode) {
+    $environmentVariablesNode = $publishedConfig.CreateElement('environmentVariables')
+    [void] $aspNetCoreNode.AppendChild($environmentVariablesNode)
+}
+$dataDirectoryNode = $environmentVariablesNode.SelectSingleNode('./environmentVariable[@name="CAWEB_DATA_DIR"]')
+if ($null -eq $dataDirectoryNode) {
+    $dataDirectoryNode = $publishedConfig.CreateElement('environmentVariable')
+    $dataDirectoryNode.SetAttribute('name', 'CAWEB_DATA_DIR')
+    [void] $environmentVariablesNode.AppendChild($dataDirectoryNode)
+}
+$dataDirectoryNode.SetAttribute('value', 'C:\ProgramData\CAWeb\data')
+if ($dataDirectoryNode.GetAttribute('value') -ne 'C:\ProgramData\CAWeb\data') { throw 'The ASP.NET Core data-directory setting could not be written to web.config.' }
 
 & (Join-Path $sourceRoot 'tests\Smoke-Test.ps1') -PublishPath $publishPath -BuildRoot $buildRoot
 if ($LASTEXITCODE -ne 0) { throw 'The CAWeb integration smoke test failed.' }

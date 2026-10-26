@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.6 — 2026-10-26
+
+- Oprava úpravy environmentVariables v IIS web.config přes XML DOM místo PowerShell property adapteru
+
 ## 0.1.5 — 2026-10-26
 
 - Oprava zpracování web.config s ASP.NET Core handlerem uvnitř IIS location elementu

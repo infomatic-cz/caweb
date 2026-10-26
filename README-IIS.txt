@@ -18,7 +18,7 @@ lze misto dotazu zadat volitelne -ServerHost "server.firma.cz".
 
 1. CAWEB
 ---------
-pwsh.exe -NoProfile -ExecutionPolicy Bypass -File C:\Transfer\Install-CAWeb.ps1 -PackagePath "C:\Transfer\CAWeb-0.1.5-win-x64.zip" -InstallRoot "C:\inetpub\CAWeb"
+pwsh.exe -NoProfile -ExecutionPolicy Bypass -File C:\Transfer\Install-CAWeb.ps1 -PackagePath "C:\Transfer\CAWeb-0.1.6-win-x64.zip" -InstallRoot "C:\inetpub\CAWeb"
 
 Pokud je na IIS vice spustenych webu s HTTPS, doplnte -SiteName "Default Web Site".
 CAWeb nevyzaduje zadani URL ani zmeny TLS vazby nebo certifikatu existujiciho webu.

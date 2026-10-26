@@ -11,12 +11,12 @@ CAWeb is installed as a separate IIS sub-application under an existing website, 
 
 ## Install
 
-1. Copy `CAWeb-0.1.5-win-x64.zip` and `Install-CAWeb.ps1` from `C:\Temp\CAWeb-Build\artifacts` to the server, for example `C:\Transfer`.
+1. Copy `CAWeb-0.1.6-win-x64.zip` and `Install-CAWeb.ps1` from `C:\Temp\CAWeb-Build\artifacts` to the server, for example `C:\Transfer`.
 2. Open 64-bit PowerShell 7 (`pwsh.exe`) **as Administrator** and run:
 
 ```powershell
 pwsh.exe -NoProfile -ExecutionPolicy Bypass -File C:\Transfer\Install-CAWeb.ps1 `
-  -PackagePath C:\Transfer\CAWeb-0.1.5-win-x64.zip `
+  -PackagePath C:\Transfer\CAWeb-0.1.6-win-x64.zip `
   -InstallRoot C:\inetpub\CAWeb
 ```
 
@@ -24,7 +24,7 @@ If IIS has only one running website with HTTPS, the installer selects it automat
 
 ```powershell
 pwsh.exe -NoProfile -ExecutionPolicy Bypass -File C:\Transfer\Install-CAWeb.ps1 `
-  -PackagePath C:\Transfer\CAWeb-0.1.5-win-x64.zip `
+  -PackagePath C:\Transfer\CAWeb-0.1.6-win-x64.zip `
   -InstallRoot C:\inetpub\CAWeb `
   -SiteName 'Name of the existing IIS website'
 ```

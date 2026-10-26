@@ -410,15 +410,16 @@ try {
     [xml] $webConfig = Get-Content -LiteralPath $webConfigPath -Raw
     $aspNetCore = Get-AspNetCoreConfigurationNode -Configuration $webConfig
     if ($null -eq $aspNetCore) { throw 'The published web.config does not contain the ASP.NET Core handler configuration.' }
-    if ($null -eq $aspNetCore.environmentVariables) {
+    $environmentVariables = $aspNetCore.SelectSingleNode('./environmentVariables')
+    if ($null -eq $environmentVariables) {
         $environmentVariables = $webConfig.CreateElement('environmentVariables')
         [void] $aspNetCore.AppendChild($environmentVariables)
     }
-    $dataVariable = @($aspNetCore.environmentVariables.environmentVariable) | Where-Object { $_.name -eq 'CAWEB_DATA_DIR' } | Select-Object -First 1
+    $dataVariable = $environmentVariables.SelectSingleNode('./environmentVariable[@name="CAWEB_DATA_DIR"]')
     if ($null -eq $dataVariable) {
         $dataVariable = $webConfig.CreateElement('environmentVariable')
         $dataVariable.SetAttribute('name', 'CAWEB_DATA_DIR')
-        [void] $aspNetCore.environmentVariables.AppendChild($dataVariable)
+        [void] $environmentVariables.AppendChild($dataVariable)
     }
     $dataVariable.SetAttribute('value', $dataPath)
     $webConfig.Save($webConfigPath)
