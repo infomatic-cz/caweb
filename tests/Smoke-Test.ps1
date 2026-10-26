@@ -280,6 +280,9 @@ try {
     $caImported = Invoke-MultipartApi -Client $adminClient -Path '/api/ca/import' -Fields @{ mode = 'pfx'; password = $caPassword; confirmReplacement = 'true' } -Files @(@{ Field = 'pfxFile'; Name = 'ca.p12'; Bytes = [IO.File]::ReadAllBytes($caPfxPath) })
     Assert-True ($caImported.authority.thumbprint -eq $originalThumbprint) 'PFX import changed the CA certificate.'
     Assert-True ($caImported.authority.publicKeyFingerprint -eq $ca.authority.publicKeyFingerprint) 'Importing the same CA changed its public key fingerprint.'
+    $pfxImportedIssuePath = Join-Path $testDirectory 'server-after-pfx-ca-import.pfx'
+    $null = Invoke-Download -Client $adminClient -Path "/api/servers/$($server.id)/issue" -Body @{ password = $serverPassword; confirmPassword = $serverPassword; reviewConfirmed = $true } -OutputPath $pfxImportedIssuePath
+    Assert-True ((Get-Item -LiteralPath $pfxImportedIssuePath).Length -gt 100) 'A server certificate could not be issued after importing a CA P12.'
 
     $caKeyPath = Join-Path $testDirectory 'ca.key'
     $null = Invoke-Download -Client $adminClient -Path '/api/ca/export' -Body @{ format = 'key'; password = $keyPassword } -OutputPath $caKeyPath
@@ -295,6 +298,9 @@ try {
         @{ Field = 'keyFile'; Name = 'ca.key'; Bytes = [IO.File]::ReadAllBytes($caKeyPath) }
     )
     Assert-True ($caImportedPair.authority.thumbprint -eq $originalThumbprint) 'PEM certificate/key import changed the CA certificate.'
+    $pairImportedIssuePath = Join-Path $testDirectory 'server-after-pem-ca-import.pfx'
+    $null = Invoke-Download -Client $adminClient -Path "/api/servers/$($server.id)/issue" -Body @{ password = $serverPassword; confirmPassword = $serverPassword; reviewConfirmed = $true } -OutputPath $pairImportedIssuePath
+    Assert-True ((Get-Item -LiteralPath $pairImportedIssuePath).Length -gt 100) 'A server certificate could not be issued after importing a PEM CA pair.'
 
     $registrationPassword = ([guid]::NewGuid().ToString('N') + 'Us5!')
     $registration = [ordered]@{ username = "smoke-$testId"; fullName = 'Smoke User'; email = 'smoke@example.test'; password = $registrationPassword; language = 'cs' }

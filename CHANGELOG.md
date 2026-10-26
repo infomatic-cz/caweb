@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.9 — 2026-10-26
+
+- Ověření vystavení serverového certifikátu po importu CA v P12 i PEM formátu
+
 ## 0.1.8 — 2026-10-26
 
 - Oprava rozlišení importované CA, podpora IPv6 v SAN, viditelné chyby formulářů a provozní záznamy
