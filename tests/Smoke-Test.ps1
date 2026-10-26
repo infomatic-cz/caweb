@@ -206,7 +206,7 @@ try {
         locality = 'Prague'
         organization = 'CAWeb Test'
         organizationalUnit = 'QA'
-        keyAlgorithm = 'RSA'
+        keyAlgorithm = 'ECDSA'
         rsaBits = 2048
         validDays = 365
         password = $caPassword
@@ -248,6 +248,7 @@ try {
     $pfxBytes = [IO.File]::ReadAllBytes($pfxPath)
     $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxBytes, $serverPassword, [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
     Assert-True $certificate.HasPrivateKey 'The issued PFX has no server private key.'
+    Assert-True ($certificate.SignatureAlgorithm.Value -eq '1.2.840.10045.4.3.2') 'An ECDSA CA did not sign the RSA server certificate with ECDSA/SHA-256.'
     Assert-True ($certificate.Subject -like '*CN=localhost*') 'The issued certificate has the wrong subject.'
     $san = $certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.17' } | Select-Object -First 1
     Assert-True ($null -ne $san -and $san.Format($true).Contains('server.example.test')) 'The issued certificate SAN does not contain the configured DNS name.'
@@ -301,6 +302,26 @@ try {
     $pairImportedIssuePath = Join-Path $testDirectory 'server-after-pem-ca-import.pfx'
     $null = Invoke-Download -Client $adminClient -Path "/api/servers/$($server.id)/issue" -Body @{ password = $serverPassword; confirmPassword = $serverPassword; reviewConfirmed = $true } -OutputPath $pairImportedIssuePath
     Assert-True ((Get-Item -LiteralPath $pairImportedIssuePath).Length -gt 100) 'A server certificate could not be issued after importing a PEM CA pair.'
+
+    $rsaCaInput = [ordered]@{
+        commonName = 'CAWeb Smoke RSA Root'; country = 'CZ'; state = 'Prague'; locality = 'Prague'
+        organization = 'CAWeb Test'; organizationalUnit = 'QA'; keyAlgorithm = 'RSA'; rsaBits = 2048
+        validDays = 365; password = $caPassword; confirmPassword = $caPassword; confirmReplacement = $true
+    }
+    $rsaCa = Invoke-JsonApi -Client $adminClient -Method POST -Path '/api/ca/generate' -Body $rsaCaInput
+    Assert-True ($rsaCa.authority.keyAlgorithm -eq 'RSA') 'The replacement RSA test CA was not generated.'
+    $ecdsaServerInput = [ordered]@{}
+    foreach ($key in $serverInput.Keys) { $ecdsaServerInput[$key] = $serverInput[$key] }
+    $ecdsaServerInput['name'] = 'smoke-ecdsa-server'
+    $ecdsaServerInput['serverType'] = 'Tomcat'
+    $ecdsaServerInput['keyAlgorithm'] = 'ECDSA'
+    $ecdsaServer = Invoke-JsonApi -Client $adminClient -Method POST -Path '/api/servers' -Body $ecdsaServerInput -ExpectedStatus @(201)
+    $ecdsaPfxPath = Join-Path $testDirectory 'server-ecdsa-leaf-rsa-ca.p12'
+    $null = Invoke-Download -Client $adminClient -Path "/api/servers/$($ecdsaServer.id)/issue" -Body @{ password = $serverPassword; confirmPassword = $serverPassword; reviewConfirmed = $true } -OutputPath $ecdsaPfxPath
+    $ecdsaLeaf = [Security.Cryptography.X509Certificates.X509Certificate2]::new([IO.File]::ReadAllBytes($ecdsaPfxPath), $serverPassword, [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+    Assert-True ($ecdsaLeaf.PublicKey.Oid.Value -eq '1.2.840.10045.2.1') 'The issued server certificate did not contain an ECDSA public key.'
+    Assert-True ($ecdsaLeaf.SignatureAlgorithm.Value -eq '1.2.840.113549.1.1.11') 'An RSA CA did not sign the ECDSA server certificate with RSA/SHA-256.'
+    $ecdsaLeaf.Dispose()
 
     $registrationPassword = ([guid]::NewGuid().ToString('N') + 'Us5!')
     $registration = [ordered]@{ username = "smoke-$testId"; fullName = 'Smoke User'; email = 'smoke@example.test'; password = $registrationPassword; language = 'cs' }
@@ -366,7 +387,7 @@ try {
     $persistedLogs = Invoke-JsonApi -Client $adminClient -Method GET -Path '/api/logs'
     Assert-True (($persistedLogs | Where-Object { $_.referenceId -eq $failedEmail.referenceId }) -ne $null) 'Operational logs did not survive an application restart.'
     $persistedServers = Invoke-JsonApi -Client $adminClient -Method GET -Path '/api/servers'
-    Assert-True ($persistedServers.Count -eq 2) 'Server records did not survive an application restart.'
+    Assert-True ($persistedServers.Count -eq 3) 'Server records did not survive an application restart.'
     $persistedServerPfx = Join-Path $testDirectory 'server-after-restart.pfx'
     $null = Invoke-Download -Client $adminClient -Path "/api/servers/$($server.id)/export" -Body @{ format = 'pfx'; password = $serverPassword } -OutputPath $persistedServerPfx
     Assert-True ((Get-Item -LiteralPath $persistedServerPfx).Length -gt 100) 'A protected certificate key could not be used after restart.'
@@ -374,7 +395,7 @@ try {
     Assert-True ((Get-Content -LiteralPath $caPemPath -Raw).StartsWith('-----BEGIN CERTIFICATE-----')) 'CA PEM export is invalid.'
 
     $pathDescription = if ($PathBase) { $PathBase } else { '/' }
-    Write-Output "PASS: $pathDescription path base, app shell/PWA assets, setup, authentication, CSRF gate, CA generation and both import formats, IPv4/IPv6 SAN issuance, protected operational logs, all exports, registration approval, user access control, SMTP secrecy, restart persistence and protected-key recovery."
+    Write-Output "PASS: $pathDescription path base, app shell/PWA assets, setup, authentication, CSRF gate, RSA/ECDSA cross-algorithm CA signing, both CA import formats, IPv4/IPv6 SAN issuance, protected operational logs, all exports, registration approval, user access control, SMTP secrecy, restart persistence and protected-key recovery."
 } catch {
     if (Test-Path -LiteralPath $logErr) {
         $logTail = Get-Content -LiteralPath $logErr -Tail 40 -ErrorAction SilentlyContinue

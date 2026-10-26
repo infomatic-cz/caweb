@@ -27,7 +27,7 @@ Pokud chcete jiný IIS web nebo složku, můžete výchozí hodnoty přepsat:
 .\Install-CAWeb.ps1 -SiteName 'Název webu v IIS' -InstallRoot 'D:\Apps\CAWeb'
 ```
 
-Pro jiný ZIP lze také použít `-PackagePath 'C:\cesta\CAWeb-0.1.9-win-x64.zip'`. Instalátor rozbalí verzi do `C:\Apps\CAWeb\releases\<verze>`, vytvoří samostatný pool `CAWeb` s identitou `ApplicationPoolIdentity` a připojí jej k existujícímu webu jako aplikaci `/caweb`. Databázi a klíče ukládá mimo web do `%ProgramData%\CAWeb\data` s omezeným ACL pro identitu poolu, SYSTEM a správce Windows.
+Pro jiný ZIP lze také použít `-PackagePath 'C:\cesta\CAWeb-0.1.11-win-x64.zip'`. Instalátor rozbalí verzi do `C:\Apps\CAWeb\releases\<verze>`, vytvoří samostatný pool `CAWeb` s identitou `ApplicationPoolIdentity` a připojí jej k existujícímu webu jako aplikaci `/caweb`. Databázi a klíče ukládá mimo web do `%ProgramData%\CAWeb\data` s omezeným ACL pro identitu poolu, SYSTEM a správce Windows.
 
 Volitelně lze pro novou instalaci nastavit identitu poolu parametrem `-ServiceAccount 'DOMENA\uzivatel'`. Heslo se vyžádá skrytým vstupem; nezadávejte ho do příkazové řádky. Při aktualizaci se aktuální identita zachová. Parametrem `-UseApplicationPoolIdentity` ji lze výslovně přepnout zpět na identitu poolu IIS.
 

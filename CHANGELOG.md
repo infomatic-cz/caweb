@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.11 — 2026-10-26
+
+- Ověření podpisu ECDSA CA nad certifikátem RSA a RSA CA nad certifikátem ECDSA
+
+## 0.1.10 — 2026-10-26
+
+- Oprava podpisu certifikátů mezi RSA a ECDSA CA/servery a přejmenování nastavení aplikace
+
 ## 0.1.9 — 2026-10-26
 
 - Ověření vystavení serverového certifikátu po importu CA v P12 i PEM formátu

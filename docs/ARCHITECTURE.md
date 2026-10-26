@@ -20,7 +20,7 @@ CAWeb je .NET 10 ASP.NET Core aplikace bez externího frontendového frameworku.
 
 1. CA import přijímá PFX/P12 s privátním klíčem nebo certifikát PEM/DER spolu s klíčem PEM. Heslo použité k importu se zahodí po načtení. Aplikace ověří CA basic constraints, případné Key Usage, platnost a shodu klíče s certifikátem. Rozhraní ukazuje SHA-1 otisk certifikátu a SHA-256 otisk veřejného klíče, aby šlo přesně určit, zda se importuje stejná CA, obnovený certifikát se stejným klíčem, nebo nový klíč.
 2. Soukromý klíč se normalizuje na PKCS#8, zašifruje pomocí účelově odděleného Data Protection purpose a uloží do SQLite. Certifikát se ukládá jako veřejné DER.
-3. Vydání serverového certifikátu vygeneruje nový RSA 3072 nebo ECDSA P-256 klíč. CSR nahrazuje přímo vytvořený požadavek `CertificateRequest`; vytvořené SAN zahrnují DNS/IP a CN. Do certifikátu se přidá `serverAuth`, základní omezení `CA:false` a vybrané KeyUsage.
+3. Vydání serverového certifikátu vygeneruje nový RSA 3072 nebo ECDSA P-256 klíč. CSR nahrazuje přímo vytvořený požadavek `CertificateRequest`; vytvořené SAN zahrnují DNS/IP a CN. Podpis se generuje klíčem aktuální CA přes odpovídající RSA nebo ECDSA podpisový generátor, takže algoritmus klíče serveru může být odlišný od algoritmu klíče CA. Do certifikátu se přidá `serverAuth`, základní omezení `CA:false` a vybrané KeyUsage.
 4. Certifikát a klíč se uloží do aplikace chráněné úložiště. PFX/P12 s privátním klíčem a pouze veřejným kořenovým certifikátem se ihned stáhne pod heslem zadaným správcem. Heslo se neukládá.
 5. Budoucí PFX, P12 nebo šifrovaný klíč PEM se při exportu znovu sestaví. Heslo se zadává při každém takovém exportu.
 

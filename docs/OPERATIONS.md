@@ -12,7 +12,7 @@ Samotná SQLite záloha bez složky `keys` neumí dešifrovat uložené privátn
 
 ## Provozní záznamy a chyby
 
-- Správce je najde v **Nastavení e-mailu → Provozní záznamy**. Seznam se načítá z posledních aplikačních varování a chyb; tlačítko **Obnovit záznamy** načte aktuální stav.
+- Správce je najde v **Nastavení aplikace → Provozní záznamy**. Seznam se načítá z posledních aplikačních varování a chyb; tlačítko **Obnovit záznamy** načte aktuální stav.
 - Neočekávaná chyba se zobrazí s krátkým ID požadavku. V záznamech vyhledejte stejné ID; detail obsahuje výjimku a zásobník volání, podle kterých lze určit příčinu.
 - Provozní soubory jsou v `%ProgramData%\CAWeb\data\logs`. Každý soubor má limit 5 MB, starší soubory se při startu aplikace mažou po 30 dnech. Zahrňte tuto složku do záloh, pokud potřebujete zachovat historii incidentů.
 - Záznamy nezahrnují těla HTTP požadavků, hesla ani obsah privátních klíčů. Přístup k prohlížeči záznamů mají pouze správci CAWeb; k souborům na disku mají přístup účty s oprávněním ke složce dat.

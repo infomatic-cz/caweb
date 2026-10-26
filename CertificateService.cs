@@ -122,7 +122,14 @@ public static class CertificateService
         var serial = RandomNumberGenerator.GetBytes(16);
         serial[0] &= 0x7f;
         if (serial.All(value => value == 0)) serial[^1] = 1;
-        using var publicCertificate = request.Create(issuer, notBefore, notAfter, serial);
+        using var issuerRsa = issuer.GetRSAPrivateKey();
+        using var issuerEcdsa = issuer.GetECDsaPrivateKey();
+        var signatureGenerator = issuerRsa is not null
+            ? X509SignatureGenerator.CreateForRSA(issuerRsa, RSASignaturePadding.Pkcs1)
+            : issuerEcdsa is not null
+                ? X509SignatureGenerator.CreateForECDsa(issuerEcdsa)
+                : throw new AppValidationException("unsupported_ca_key");
+        using var publicCertificate = request.Create(issuer.SubjectName, signatureGenerator, notBefore, notAfter, serial);
         using var privateCertificate = leafKey is RSA rsa
             ? publicCertificate.CopyWithPrivateKey(rsa)
             : publicCertificate.CopyWithPrivateKey((ECDsa)leafKey);
