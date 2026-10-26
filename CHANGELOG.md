@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 — 2026-10-26
+
+- Aktualizace IIS instalátoru na PowerShell 7 a AppCmd, zachování identities při aktualizaci, oprava dokumentace a balení skriptu
+
 ## 0.1.3 — 2026-10-23
 
 - Oprava routování pod IIS cestou /caweb a instalace jako podaplikace existujícího HTTPS webu

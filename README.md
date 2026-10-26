@@ -25,7 +25,7 @@ Zdrojové soubory patří do repozitáře; `Podklady/` je pouze lokální vstupn
 
 ## Verze a vydání
 
-Všechna sestavení, NuGet balíčky, testovací data i ZIP se vytvářejí v `C:\Temp\CAWeb-Build`, nikdy v OneDrive. Výsledný instalační ZIP a samostatný skript `Install-IIS.ps1` jsou ve složce `C:\Temp\CAWeb-Build\artifacts`. Pro další změnu použijte z kořene repozitáře:
+Všechna sestavení, NuGet balíčky, testovací data i ZIP se vytvářejí v `C:\Temp\CAWeb-Build`, nikdy v OneDrive. Výsledný instalační ZIP a samostatný skript `Install-CAWeb.ps1` jsou ve složce `C:\Temp\CAWeb-Build\artifacts`. Skript vyžaduje 64bitový PowerShell 7 a správcovská oprávnění na Windows Serveru. Pro další změnu použijte z kořene repozitáře:
 
 ```powershell
 .\Release.ps1 -Summary "Stručný popis změny"

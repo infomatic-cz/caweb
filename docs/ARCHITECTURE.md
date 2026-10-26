@@ -35,5 +35,5 @@ CA key material and server key material are decrypted only for the operation tha
 
 - Aplikace záměrně drží pouze jednu aktuální CA. Změna CA označí staré certifikáty stavem `CA changed`; nová serverová sada a distribuce důvěryhodného kořene jsou samostatná operace.
 - Certifikáty nejsou automaticky instalovány na vzdálené servery. Uživatel importuje připravený PFX/P12 do IIS/Tomcat.
-- Provozujte aplikaci pod existujícím IIS webem přes jeho HTTPS binding. `Install-IIS.ps1` vytvoří vlastní pool a podaplikaci `/caweb`; nepřidává ani neupravuje binding, hostname, certifikát ani kořenovou aplikaci.
+- Provozujte aplikaci pod existujícím IIS webem přes jeho HTTPS binding. `Install-CAWeb.ps1` vytvoří vlastní pool a podaplikaci `/caweb`; nepřidává ani neupravuje binding, hostname, certifikát ani kořenovou aplikaci.
 - Data Protection key ring pod datovým adresářem a SQLite jsou svázané s tímto Windows serverem přes DPAPI LocalMachine. Záloha musí zahrnovat obojí, nebo je třeba uchovávat CA mimo aplikaci.

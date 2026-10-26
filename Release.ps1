@@ -102,7 +102,7 @@ $workerText = [regex]::Replace($workerText, "const CACHE = 'caweb-shell-\d+\.\d+
 
 $summaryLine = ($Summary -replace '[\r\n]+', ' ').Trim()
 Add-ChangelogEntry -Path (Join-Path $sourceRoot 'CHANGELOG.md') -Version $version -Text $summaryLine
-foreach ($docsPath in @('docs\INSTALL-IIS-CS.md', 'docs\INSTALL-IIS-EN.md')) {
+foreach ($docsPath in @('docs\INSTALL-IIS-CS.md', 'docs\INSTALL-IIS-EN.md', 'README-IIS.txt')) {
     $path = Join-Path $sourceRoot $docsPath
     $contents = [IO.File]::ReadAllText($path)
     $contents = [regex]::Replace($contents, 'CAWeb-\d+\.\d+\.\d+-win-x64\.zip', "CAWeb-$version-win-x64.zip")
@@ -137,14 +137,15 @@ $publishPath = Join-Path $buildRoot 'publish'
 $testsPath = Join-Path $buildRoot 'tests'
 $packagePath = Join-Path $buildRoot 'package'
 $artifactsPath = Join-Path $buildRoot 'artifacts'
-foreach ($path in @($objPath, $binPath, $publishPath, $testsPath, $packagePath, $artifactsPath)) { Reset-BuildDirectory -Path $path }
+foreach ($path in @($objPath, $binPath, $publishPath, $testsPath, $packagePath)) { Reset-BuildDirectory -Path $path }
+$null = New-Item -ItemType Directory -Path $artifactsPath -Force
 
 & node --check (Join-Path $sourceRoot 'wwwroot\app.js')
 if ($LASTEXITCODE -ne 0) { throw 'JavaScript syntax validation failed.' }
 $parseErrors = $null
 $parseTokens = $null
-[void] [Management.Automation.Language.Parser]::ParseFile((Join-Path $sourceRoot 'Install-IIS.ps1'), [ref]$parseTokens, [ref]$parseErrors)
-if ($parseErrors.Count -gt 0) { throw "Install-IIS.ps1 has a PowerShell parse error: $($parseErrors[0].Message)" }
+[void] [Management.Automation.Language.Parser]::ParseFile((Join-Path $sourceRoot 'Install-CAWeb.ps1'), [ref]$parseTokens, [ref]$parseErrors)
+if ($parseErrors.Count -gt 0) { throw "Install-CAWeb.ps1 has a PowerShell parse error: $($parseErrors[0].Message)" }
 $parseErrors = $null
 $parseTokens = $null
 [void] [Management.Automation.Language.Parser]::ParseFile((Join-Path $sourceRoot 'tests\Smoke-Test.ps1'), [ref]$parseTokens, [ref]$parseErrors)
@@ -173,7 +174,7 @@ $manifest = [ordered]@{
 }
 $manifest | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $packagePath 'caweb-release.json') -Encoding UTF8
 Get-ChildItem -LiteralPath $publishPath -Force | Copy-Item -Destination $packagePath -Recurse -Force
-foreach ($relative in @('Install-IIS.ps1', 'README.md', 'CHANGELOG.md', 'docs\INSTALL-IIS-CS.md', 'docs\INSTALL-IIS-EN.md', 'docs\OPERATIONS.md')) {
+foreach ($relative in @('Install-CAWeb.ps1', 'README.md', 'CHANGELOG.md', 'docs\INSTALL-IIS-CS.md', 'docs\INSTALL-IIS-EN.md', 'docs\OPERATIONS.md')) {
     $destination = Join-Path $packagePath $relative
     $null = New-Item -ItemType Directory -Path (Split-Path -Parent $destination) -Force
     Copy-Item -LiteralPath (Join-Path $sourceRoot $relative) -Destination $destination -Force
@@ -185,7 +186,7 @@ $unsafePackageFiles = Get-ChildItem -LiteralPath $packagePath -Recurse -File | W
 if ($unsafePackageFiles) { throw "The release package contains a local key, database or source artifact: $($unsafePackageFiles[0].Name)" }
 $archivePath = Join-Path $artifactsPath "CAWeb-$version-win-x64.zip"
 Compress-Archive -Path (Join-Path $packagePath '*') -DestinationPath $archivePath -CompressionLevel Optimal -Force
-Copy-Item -LiteralPath (Join-Path $sourceRoot 'Install-IIS.ps1') -Destination (Join-Path $artifactsPath 'Install-IIS.ps1') -Force
+Copy-Item -LiteralPath (Join-Path $sourceRoot 'Install-CAWeb.ps1') -Destination (Join-Path $artifactsPath 'Install-CAWeb.ps1') -Force
 
 Invoke-Git -Arguments @('add', '--all') | Out-Null
 $staged = @(& git diff --cached --name-only)
