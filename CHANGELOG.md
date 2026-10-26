@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.5 — 2026-10-26
+
+- Oprava zpracování web.config s ASP.NET Core handlerem uvnitř IIS location elementu
+
 ## 0.1.4 — 2026-10-26
 
 - Aktualizace IIS instalátoru na PowerShell 7 a AppCmd, zachování identities při aktualizaci, oprava dokumentace a balení skriptu

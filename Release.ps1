@@ -160,6 +160,12 @@ $publishArguments = @(
 )
 & $dotnetPath @publishArguments
 if ($LASTEXITCODE -ne 0) { throw 'The self-contained Windows x64 publish failed.' }
+$publishedConfigPath = Join-Path $publishPath 'web.config'
+if (-not (Test-Path -LiteralPath $publishedConfigPath -PathType Leaf)) { throw 'The publish output is missing web.config.' }
+[xml] $publishedConfig = [IO.File]::ReadAllText($publishedConfigPath)
+$aspNetCoreNode = $publishedConfig.SelectSingleNode('/configuration/location/system.webServer/aspNetCore')
+if ($null -eq $aspNetCoreNode) { $aspNetCoreNode = $publishedConfig.SelectSingleNode('/configuration/system.webServer/aspNetCore') }
+if ($null -eq $aspNetCoreNode) { throw 'The published web.config has no ASP.NET Core handler node in its IIS configuration location.' }
 
 & (Join-Path $sourceRoot 'tests\Smoke-Test.ps1') -PublishPath $publishPath -BuildRoot $buildRoot
 if ($LASTEXITCODE -ne 0) { throw 'The CAWeb integration smoke test failed.' }

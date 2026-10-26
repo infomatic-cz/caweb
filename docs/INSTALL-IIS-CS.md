@@ -11,12 +11,12 @@ CAWeb se instaluje jako samostatná IIS podaplikace pod již běžící web, nap
 
 ## Instalace
 
-1. Zkopírujte `CAWeb-0.1.4-win-x64.zip` a `Install-CAWeb.ps1` z `C:\Temp\CAWeb-Build\artifacts` na server, například do `C:\Transfer`.
+1. Zkopírujte `CAWeb-0.1.5-win-x64.zip` a `Install-CAWeb.ps1` z `C:\Temp\CAWeb-Build\artifacts` na server, například do `C:\Transfer`.
 2. Otevřete 64bitový PowerShell 7 (`pwsh.exe`) **jako správce** a spusťte:
 
 ```powershell
 pwsh.exe -NoProfile -ExecutionPolicy Bypass -File C:\Transfer\Install-CAWeb.ps1 `
-  -PackagePath C:\Transfer\CAWeb-0.1.4-win-x64.zip `
+  -PackagePath C:\Transfer\CAWeb-0.1.5-win-x64.zip `
   -InstallRoot C:\inetpub\CAWeb
 ```
 
@@ -24,7 +24,7 @@ Pokud je na IIS jediný spuštěný web s HTTPS, instalátor jej vybere automati
 
 ```powershell
 pwsh.exe -NoProfile -ExecutionPolicy Bypass -File C:\Transfer\Install-CAWeb.ps1 `
-  -PackagePath C:\Transfer\CAWeb-0.1.4-win-x64.zip `
+  -PackagePath C:\Transfer\CAWeb-0.1.5-win-x64.zip `
   -InstallRoot C:\inetpub\CAWeb `
   -SiteName 'Název existujícího webu v IIS'
 ```

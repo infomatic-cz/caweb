@@ -91,6 +91,13 @@ function Get-IisAppPool {
     @(Get-IisObjects -Entity 'apppool') | Where-Object { $_.GetAttribute('APPPOOL.NAME') -ieq $Name } | Select-Object -First 1
 }
 
+function Get-AspNetCoreConfigurationNode {
+    param([Parameter(Mandatory)][xml] $Configuration)
+    $node = $Configuration.SelectSingleNode('/configuration/location/system.webServer/aspNetCore')
+    if ($null -eq $node) { $node = $Configuration.SelectSingleNode('/configuration/system.webServer/aspNetCore') }
+    return $node
+}
+
 function Test-IisHttpsBinding {
     param([Parameter(Mandatory)] $Site, [string] $Hostname, [switch] $Port443)
     $bindingText = $Site.GetAttribute('bindings')
@@ -363,7 +370,7 @@ try {
     $publishedWebConfig = Join-Path $stagingPath 'web.config'
     if (-not (Test-Path -LiteralPath $publishedWebConfig -PathType Leaf)) { throw 'CAWeb release is missing web.config.' }
     [xml]$publishedConfig = Get-Content -LiteralPath $publishedWebConfig -Raw
-    if ($null -eq $publishedConfig.configuration.'system.webServer'.aspNetCore) {
+    if ($null -eq (Get-AspNetCoreConfigurationNode -Configuration $publishedConfig)) {
         throw 'The published web.config does not contain the ASP.NET Core handler configuration.'
     }
 
@@ -401,7 +408,7 @@ try {
     $webConfigPath = Join-Path $releasePath 'web.config'
     if (-not (Test-Path -LiteralPath $webConfigPath -PathType Leaf)) { throw 'CAWeb release is missing web.config.' }
     [xml] $webConfig = Get-Content -LiteralPath $webConfigPath -Raw
-    $aspNetCore = $webConfig.configuration.'system.webServer'.aspNetCore
+    $aspNetCore = Get-AspNetCoreConfigurationNode -Configuration $webConfig
     if ($null -eq $aspNetCore) { throw 'The published web.config does not contain the ASP.NET Core handler configuration.' }
     if ($null -eq $aspNetCore.environmentVariables) {
         $environmentVariables = $webConfig.CreateElement('environmentVariables')
