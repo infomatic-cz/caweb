@@ -248,6 +248,7 @@ try {
     $pfxBytes = [IO.File]::ReadAllBytes($pfxPath)
     $certificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxBytes, $serverPassword, [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
     Assert-True $certificate.HasPrivateKey 'The issued PFX has no server private key.'
+    Assert-True ($certificate.FriendlyName -eq $serverInput.name) 'The issued server PFX does not contain the server name as its friendly name.'
     Assert-True ($certificate.SignatureAlgorithm.Value -eq '1.2.840.10045.4.3.2') 'An ECDSA CA did not sign the RSA server certificate with ECDSA/SHA-256.'
     Assert-True ($certificate.Subject -like '*CN=localhost*') 'The issued certificate has the wrong subject.'
     $san = $certificate.Extensions | Where-Object { $_.Oid.Value -eq '2.5.29.17' } | Select-Object -First 1
@@ -391,6 +392,9 @@ try {
     $persistedServerPfx = Join-Path $testDirectory 'server-after-restart.pfx'
     $null = Invoke-Download -Client $adminClient -Path "/api/servers/$($server.id)/export" -Body @{ format = 'pfx'; password = $serverPassword } -OutputPath $persistedServerPfx
     Assert-True ((Get-Item -LiteralPath $persistedServerPfx).Length -gt 100) 'A protected certificate key could not be used after restart.'
+    $persistedCertificate = [Security.Cryptography.X509Certificates.X509Certificate2]::new([IO.File]::ReadAllBytes($persistedServerPfx), $serverPassword, [Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+    Assert-True ($persistedCertificate.FriendlyName -eq $serverInput.name) 'A server PFX export lost the friendly name after a database reload.'
+    $persistedCertificate.Dispose()
 
     Assert-True ((Get-Content -LiteralPath $caPemPath -Raw).StartsWith('-----BEGIN CERTIFICATE-----')) 'CA PEM export is invalid.'
 

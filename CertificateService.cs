@@ -133,6 +133,7 @@ public static class CertificateService
         using var privateCertificate = leafKey is RSA rsa
             ? publicCertificate.CopyWithPrivateKey(rsa)
             : publicCertificate.CopyWithPrivateKey((ECDsa)leafKey);
+        SetFriendlyName(privateCertificate, server.Name);
 
         var pkcs8 = ExportPkcs8(leafKey);
         var protectedKey = protector.Protect(pkcs8);
@@ -156,6 +157,7 @@ public static class CertificateService
     {
         if (server.CertificateDer is null || server.ProtectedPrivateKey is null) throw new AppValidationException("certificate_not_issued");
         using var certificate = AttachPrivateKey(server.CertificateDer, protector.Unprotect(server.ProtectedPrivateKey), server.KeyAlgorithm);
+        SetFriendlyName(certificate, server.Name);
         X509Certificate2? issuer = null;
         if (authority is not null && server.IssuerThumbprint == authority.Thumbprint)
             issuer = new X509Certificate2(authority.CertificateDer);
@@ -434,6 +436,11 @@ public static class CertificateService
     {
         var collection = new X509Certificate2Collection { certificate, issuer };
         return collection.Export(X509ContentType.Pkcs12, password) ?? throw new AppValidationException("certificate_export_failed");
+    }
+
+    private static void SetFriendlyName(X509Certificate2 certificate, string serverName)
+    {
+        if (OperatingSystem.IsWindows()) certificate.FriendlyName = InputValidation.Clean(serverName, 100);
     }
 
     private static CertificateDownload Export(X509Certificate2 certificate, X509Certificate2? issuer, string name, string format, string? password)

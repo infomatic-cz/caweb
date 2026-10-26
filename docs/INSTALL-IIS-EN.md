@@ -27,7 +27,7 @@ To use a different IIS website or folder, override the defaults:
 .\Install-CAWeb.ps1 -SiteName 'IIS website name' -InstallRoot 'D:\Apps\CAWeb'
 ```
 
-To select a different ZIP explicitly, pass `-PackagePath 'C:\path\CAWeb-0.1.11-win-x64.zip'`. The installer extracts the version to `C:\Apps\CAWeb\releases\<version>`, creates a dedicated `CAWeb` application pool with `ApplicationPoolIdentity`, and attaches it to the existing website as `/caweb`. The database and keys are stored outside the website in `%ProgramData%\CAWeb\data`, with a restricted ACL for the pool identity, SYSTEM, and Windows administrators.
+To select a different ZIP explicitly, pass `-PackagePath 'C:\path\CAWeb-0.1.12-win-x64.zip'`. The installer extracts the version to `C:\Apps\CAWeb\releases\<version>`, creates a dedicated `CAWeb` application pool with `ApplicationPoolIdentity`, and attaches it to the existing website as `/caweb`. The database and keys are stored outside the website in `%ProgramData%\CAWeb\data`, with a restricted ACL for the pool identity, SYSTEM, and Windows administrators.
 
 For a new installation, you can optionally set the pool identity with `-ServiceAccount 'DOMAIN\user'`. The installer prompts for the password securely; don't put it on the command line. During upgrades, it preserves the current identity. Use `-UseApplicationPoolIdentity` to explicitly switch back to the IIS application pool identity.
 

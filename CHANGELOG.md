@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.12 — 2026-10-26
+
+- Doplnění Friendly Name serveru do vydaných a exportovaných PFX/P12
+
 ## 0.1.11 — 2026-10-26
 
 - Ověření podpisu ECDSA CA nad certifikátem RSA a RSA CA nad certifikátem ECDSA

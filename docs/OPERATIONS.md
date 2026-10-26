@@ -23,6 +23,7 @@ Samotná SQLite záloha bez složky `keys` neumí dešifrovat uložené privátn
 - Upozornění na výměnu klíče se zobrazuje při generování nové CA, protože to vždy vytvoří nový klíč. Při importu se nejdřív zobrazí obecné potvrzení nahrazení existující autority; po importu aplikace porovná otisk certifikátu a SHA-256 otisk veřejného klíče.
 - Pokud se shoduje SHA-1 otisk certifikátu, byla naimportována totožná CA. Pokud se certifikát liší, ale SHA-256 otisk klíče se shoduje, zkontrolujte stav certifikátů a distribuci obnoveného certifikátu CA. Při rozdílném klíči je nutné vydat serverové certifikáty znovu a distribuovat nový kořen.
 - IPv4 i IPv6 lze zadat do pole alternativních IP adres. Veřejný certifikát obsahuje tyto adresy v SAN jako IP adresy.
+- Název serveru se uloží také jako `Friendly Name` v PFX/P12. IIS jej zobrazí v místním úložišti certifikátů; nejde o CN certifikátu, který zůstává jeho DNS/IP identitou. Stejný Friendly Name se přidá i při pozdějším exportu PFX/P12.
 
 ## Obnova aplikace
 
